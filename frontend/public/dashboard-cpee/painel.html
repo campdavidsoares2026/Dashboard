@@ -51,7 +51,7 @@ body::before {
   height: 100vh;
   width: 100vw;
   display: grid;
-  grid-template-rows: 66px 1fr 118px 1fr 42px;
+  grid-template-rows: 66px 1fr 118px 1fr 64px;
   gap: 8px;
   padding: 10px;
 }
@@ -353,12 +353,47 @@ body::before {
 
 /* ─────── FOOTER ─────── */
 .footer {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 14px;
-  font-size: 11px; color: var(--t3); letter-spacing: .03em;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 4px 14px;
+  gap: 5px;
 }
 .footer a { color: var(--blue); text-decoration: none; }
 .footer-refresh { font-family: var(--mono); font-size: 11px; color: var(--t2); }
+
+/* footer bottom row (original info) */
+.footer-info {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; color: var(--t3); letter-spacing: .03em;
+}
+
+/* ─────── INFRA HEALTH BAR ─────── */
+.infra-bar {
+  display: flex; align-items: center; gap: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding-bottom: 5px;
+}
+.infra-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 600; color: var(--t2);
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.infra-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--t3);
+  transition: background 0.4s;
+  flex-shrink: 0;
+}
+.infra-dot.ok   { background: var(--green);
+  box-shadow: 0 0 6px rgba(108,180,84,.55); }
+.infra-dot.slow { background: var(--yellow);
+  box-shadow: 0 0 6px rgba(255,213,0,.55); }
+.infra-dot.err  { background: var(--red);
+  box-shadow: 0 0 6px rgba(239,68,68,.55); }
+.infra-ms {
+  font-family: var(--mono); font-size: 9px; color: var(--t3);
+  min-width: 28px;
+}
+.infra-sep { color: rgba(255,255,255,0.12); font-size: 12px; user-select: none; }
 
 /* ─────── LOADING ─────── */
 .overlay {
@@ -520,9 +555,36 @@ body::before {
 
   <!-- ═══ FOOTER ═══ -->
   <footer class="footer">
-    <span>CPEE Painel · v1.0 · <a href="/dashboard-cpee/standalone.html">→ Painel analítico completo</a></span>
-    <span id="last-sync">—</span>
-    <span class="footer-refresh">Atualização em <span id="cntdwn">5:00</span></span>
+
+    <!-- Saúde da Infraestrutura -->
+    <div class="infra-bar">
+      <span class="infra-item">
+        <span class="infra-dot" id="dot-db"></span>
+        <span>Banco de Dados</span>
+        <span class="infra-ms" id="ms-db"></span>
+      </span>
+      <span class="infra-sep">|</span>
+      <span class="infra-item">
+        <span class="infra-dot" id="dot-dash"></span>
+        <span>Dashboard</span>
+        <span class="infra-ms" id="ms-dash"></span>
+      </span>
+      <span class="infra-sep">|</span>
+      <span class="infra-item">
+        <span class="infra-dot" id="dot-bk"></span>
+        <span>Backend</span>
+        <span class="infra-ms" id="ms-bk"></span>
+      </span>
+      <!-- LPs adicionadas aqui quando disponíveis -->
+    </div>
+
+    <!-- Info footer -->
+    <div class="footer-info">
+      <span>CPEE Painel · v1.0 · <a href="/dashboard-cpee/standalone.html">→ Painel analítico completo</a></span>
+      <span id="last-sync">—</span>
+      <span class="footer-refresh">Atualização em <span id="cntdwn">5:00</span></span>
+    </div>
+
   </footer>
 
 </div><!-- /painel -->
@@ -808,6 +870,81 @@ function showErr(msg) {
 }
 
 /* ═══════════════════════════════════════════
+   INFRAESTRUTURA — HEALTH CHECK
+═══════════════════════════════════════════ */
+const INFRA = [
+  {
+    id: "db",
+    check: async () => {
+      const t = Date.now();
+      const r = await fetch(`${SUPA_URL}/rest/v1/execucoes?select=id&limit=1`, {
+        headers: HDR,
+        signal: AbortSignal.timeout(6000),
+      });
+      return { ok: r.ok, ms: Date.now() - t };
+    },
+  },
+  {
+    id: "dash",
+    check: async () => {
+      const t = Date.now();
+      // no-cors: opaque response (status 0) — qualquer conexão bem-sucedida = online
+      await fetch("https://dashboard-prod-six.vercel.app/dashboard-cpee/standalone.html", {
+        mode: "no-cors",
+        signal: AbortSignal.timeout(6000),
+      });
+      return { ok: true, ms: Date.now() - t };
+    },
+  },
+  {
+    id: "bk",
+    check: async () => {
+      const t = Date.now();
+      await fetch("https://backend-psi-orpin-13.vercel.app/", {
+        mode: "no-cors",
+        signal: AbortSignal.timeout(6000),
+      });
+      return { ok: true, ms: Date.now() - t };
+    },
+  },
+  /* — LPs (adicionar quando disponíveis) —
+  { id: "lp1", label: "LP Reforma", check: async () => {
+      const t = Date.now();
+      await fetch("https://bndigital.com.br/reforma", { mode: "no-cors", signal: AbortSignal.timeout(6000) });
+      return { ok: true, ms: Date.now() - t };
+  }}, */
+];
+
+function applyInfra(id, result) {
+  const dot = document.getElementById(`dot-${id}`);
+  const ms  = document.getElementById(`ms-${id}`);
+  if (!dot) return;
+  const cls = !result.ok ? "err" : result.ms > 2000 ? "slow" : "ok";
+  dot.className = `infra-dot ${cls}`;
+  if (ms) ms.textContent = result.ok ? `${result.ms}ms` : "erro";
+}
+
+async function checkInfra() {
+  // Reset dots to "checking" (grey, sem classe)
+  INFRA.forEach(s => {
+    const d = document.getElementById(`dot-${s.id}`);
+    const m = document.getElementById(`ms-${s.id}`);
+    if (d) { d.className = "infra-dot"; }
+    if (m) { m.textContent = "…"; }
+  });
+  await Promise.all(
+    INFRA.map(async svc => {
+      try {
+        const r = await svc.check();
+        applyInfra(svc.id, r);
+      } catch {
+        applyInfra(svc.id, { ok: false, ms: null });
+      }
+    })
+  );
+}
+
+/* ═══════════════════════════════════════════
    MAIN LOAD
 ═══════════════════════════════════════════ */
 async function loadAndRender() {
@@ -823,6 +960,8 @@ async function loadAndRender() {
     document.getElementById("overlay").style.display = "none";
     document.getElementById("painel").style.visibility = "visible";
   }
+  // Refresh infra health a cada ciclo de dados
+  checkInfra();
   startCountdown();
 }
 
@@ -836,8 +975,9 @@ tickClock();
 // Election countdown
 set("dias-el", Math.max(0, Math.ceil((ELECTION - new Date()) / 86400000)));
 
-// Load data
+// Load data + infra check
 loadAndRender();
+checkInfra();
 </script>
 </body>
 </html>
