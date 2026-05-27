@@ -90,6 +90,69 @@ body[data-tone="midnight"] {
   --border-divider: rgba(255,255,255,0.07);
 }
 
+/* ── PODEMOS LIGHT THEME — partido cores: verde #6CB454 · azul #3A589D · amarelo #FFD500 ── */
+body[data-tone="podemos"] {
+  /* Palette overrides */
+  --brand-green:   #6CB454;
+  --brand-gold:    #FFD500;
+  --brand-blue:    #3A589D;
+  /* Accents remapped: status keep semantic meaning */
+  --accent-hot:     #DC2626;   /* alert red */
+  --accent-warm:    #D97706;   /* warning amber */
+  --accent-cold:    #3A589D;   /* Podemos blue = primary */
+  --accent-success: #6CB454;   /* Podemos green = good */
+
+  /* Text — DARK on light surfaces */
+  --text-primary:   #0F172A;
+  --text-secondary: #475569;
+  --text-tertiary:  #64748B;
+  --text-disabled:  #94A3B8;
+
+  /* Light surface system */
+  --bg-app-1:    #F7F9F5;
+  --bg-app-2:    #ECF2E8;
+  --bg-card:     rgba(255,255,255,0.95);
+  --bg-card-hi:  rgba(255,255,255,1);
+  --bg-card-2:   rgba(108,180,84,0.04);
+  --glass-blur:  10px;
+
+  --border-divider: rgba(15,23,42,0.08);
+  --border-hover:   rgba(15,23,42,0.18);
+  --border-glass:   rgba(58,88,157,0.15);
+
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,1) inset,
+    0 0 0 1px rgba(58,88,157,0.10),
+    0 4px 16px -4px rgba(58,88,157,0.10),
+    0 1px 4px -1px rgba(58,88,157,0.06);
+  --shadow-card-hover:
+    0 1px 0 rgba(255,255,255,1) inset,
+    0 0 0 1px rgba(58,88,157,0.18),
+    0 8px 24px -6px rgba(58,88,157,0.18),
+    0 2px 6px -2px rgba(58,88,157,0.10);
+}
+body[data-tone="podemos"] {
+  background-image:
+    radial-gradient(ellipse 900px 600px at -5% 0%,   rgba(108,180,84,0.10)  0%, transparent 65%),
+    radial-gradient(ellipse 700px 500px at 110% -5%, rgba(255,213,0,0.10)   0%, transparent 60%),
+    radial-gradient(ellipse 1000px 700px at 50% 110%,rgba(58,88,157,0.10)   0%, transparent 65%) !important;
+}
+body[data-tone="podemos"] .dash-header {
+  background: rgba(247,249,245,0.88) !important;
+  border-bottom: 1px solid var(--border-divider) !important;
+}
+body[data-tone="podemos"] .card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-divider) !important;
+}
+body[data-tone="podemos"] .dash-title-strong {
+  background: linear-gradient(90deg, #3A589D 0%, #6CB454 50%, #D4A017 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+}
+
 body[data-tone="midnight"] {
   --bg-app-1: #050816;
   --bg-app-2: #0A0F24;
@@ -3336,11 +3399,8 @@ function DistribuicaoCpee({ cpee, target = 28, warmRange = 4 }) {
 
   return (
     <div className="card gauge-card">
-      <div className="card-head">
-        <div>
-          <h3 className="card-title">Distribuição CPEE</h3>
-          <p className="card-sub">Saúde consolidada · meta R$ {target.toFixed(0)}</p>
-        </div>
+      <div className="card-head" style={{ justifyContent: 'center', textAlign: 'center' }}>
+        <h3 className="card-title" style={{ fontSize: '20px', fontWeight: 600, letterSpacing: '-0.2px' }}>Distribuição CPEE</h3>
       </div>
       <div className="gauge-wrap">
         <svg viewBox="0 0 240 150" className="gauge-svg">
@@ -5220,7 +5280,32 @@ function CandidateHero({ spend, periodLabel, teto, onEditTeto, monthly, onEditMo
   );
 }
 
-function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, onOpenSettings, onOpenMeta, countdown }) {
+// Toggle between dark default and Podemos-light theme. Drives the tweaks system so
+// the choice persists across the useTweaks effect that also writes data-tone.
+function ThemeToggle({ currentTone, setBgTone }) {
+  const isPodemos = currentTone === "podemos";
+  const nextTone = isPodemos ? "navy" : "podemos";
+  const label = isPodemos ? "PODEMOS" : "DARK";
+  const icon = isPodemos ? "🟢" : "🌙";
+  return (
+    <button
+      onClick={() => setBgTone(nextTone)}
+      title={isPodemos ? "Trocar para Dark" : "Trocar para tema Podemos (fundo claro)"}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "6px 10px", borderRadius: 8,
+        background: "var(--bg-card)", border: "1px solid var(--border-divider)",
+        color: "var(--text-secondary)", fontSize: 11, fontWeight: 600,
+        letterSpacing: "0.02em", cursor: "pointer",
+      }}
+    >
+      <span style={{ fontSize: 14 }}>{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, onOpenSettings, onOpenMeta, countdown, currentTone, setBgTone }) {
   const statusLabel = {
     mock: "Mock",
     loading: "Carregando…",
@@ -5241,6 +5326,7 @@ function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, 
       </div>
 
       <div className="header-tools">
+        <ThemeToggle currentTone={currentTone} setBgTone={setBgTone} />
         <button className="btn-meta" onClick={onOpenMeta}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
             <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 3v13M8 10l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -5274,12 +5360,15 @@ function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, 
 }
 
 function Dashboard() {
+  // Read persisted theme choice (set by ThemeToggle) before useTweaks initialises
+  let _savedTone = "navy";
+  try { _savedTone = localStorage.getItem("dashboard_theme") || "navy"; } catch {}
   const [t, setTweak] = useTweaks({
     accent_hot: "#EF4444",
     accent_warm: "#F59E0B",
     accent_cold: "#3B82F6",
     accent_success: "#10B981",
-    bg_tone: "navy",
+    bg_tone: _savedTone,
     display_font: "Space Grotesk",
     body_font: "Inter",
     density: "comfortable",
@@ -5432,6 +5521,8 @@ function Dashboard() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenMeta={() => setMetaImportOpen(true)}
         countdown={countdown}
+        currentTone={t.bg_tone}
+        setBgTone={(v) => { setTweak("bg_tone", v); try { localStorage.setItem("dashboard_theme", v); } catch {} }}
       />
 
       <CandidateHero
