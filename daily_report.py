@@ -172,6 +172,9 @@ class MetaAdsDataSync:
         return None
 
     def sync_metricas_conta(self, account_id: str, nome: str, m: Dict, execucao_id: str) -> bool:
+        # metricas_conta is "current state" — delete previous rows for this account
+        # before inserting the new one (prevents row accumulation across daily runs).
+        self.db.delete("metricas_conta", {"account_id": account_id})
         cpee = m["cpee"]
         row = {
             "execucao_id": execucao_id,

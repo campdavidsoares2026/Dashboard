@@ -4207,7 +4207,8 @@ async function fetchFromBackend(baseUrl) {
 
 async function fetchFromSupabase(client) {
   const queries = await Promise.allSettled([
-    client.from("metricas_conta").select("*"),
+    // Order by executado_em DESC so dedup-by-first picks the LATEST snapshot per account
+    client.from("metricas_conta").select("*").order("executado_em", { ascending: false }),
     client.from("snapshots_diarios").select("*").order("data", { ascending: true }).limit(20000),
     client.from("recomendacoes").select("*").order("criado_em", { ascending: false }).limit(200),
     client.from("criativos_performance").select("*").order("spend", { ascending: false }).limit(50),
