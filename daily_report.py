@@ -105,9 +105,11 @@ class MetaAdsDataSync:
 
     def fetch_account_insights(self, account_id: str, date_start: str, date_stop: str) -> List[Dict]:
         try:
+            # Meta Ads API expects time_range as JSON, NOT date_start/date_stop (those are ignored
+            # silently and Meta returns the default 28-day lifetime aggregate). Bug fix: 2026-05-27.
+            import json as _json
             data = self._meta_get(f"{account_id}/insights", {
-                "date_start": date_start,
-                "date_stop": date_stop,
+                "time_range": _json.dumps({"since": date_start, "until": date_stop}),
                 "fields": "campaign_id,campaign_name,impressions,reach,clicks,spend,frequency,actions",
                 "level": "campaign",
                 "limit": 1000,
@@ -296,12 +298,16 @@ class MetaAdsDataSync:
         logger.info("Starting daily Meta Ads report sync")
         logger.info("=" * 80)
 
-        date_stop = datetime.now().date()
-        date_start = date_stop - timedelta(days=1)
-        date_start_str = date_start.isoformat()
-        date_stop_str = date_stop.isoformat()
+        # Meta's `until` is inclusive — to sync "yesterday" we use yesterday for both since/until.
+        # Optional CLI arg: a YYYY-MM-DD date to sync that specific day (used by backfill).
+        if len(sys.argv) >= 2 and len(sys.argv[1]) == 10 and sys.argv[1].count("-") == 2:
+            target = datetime.fromisoformat(sys.argv[1]).date()
+        else:
+            target = datetime.now().date() - timedelta(days=1)
+        date_start_str = target.isoformat()
+        date_stop_str = target.isoformat()
 
-        logger.info(f"Period: {date_start_str} → {date_stop_str}")
+        logger.info(f"Period: {date_start_str} → {date_stop_str} (single day)")
 
         # Collect all account data first (needed to create execucao summary)
         accounts_data = []

@@ -2610,7 +2610,9 @@ function mulberry32(seed) {
   };
 }
 
-const TODAY = new Date("2026-05-14T00:00:00Z");
+// Anchor "today" to the most recent date present in real data (cron writes daily at 09:00).
+// Falls back to system date if no live data is loaded yet.
+const TODAY = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z");
 const START = new Date("2026-01-01T00:00:00Z");
 const TOTAL_DAYS = Math.round((TODAY - START) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -5297,7 +5299,7 @@ function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [chartMetric, setChartMetric] = useState("cpee");
   const [refreshing, setRefreshing] = useState(false);
-  const [now, setNow] = useState(new Date("2026-05-14T14:32:00"));
+  const [now, setNow] = useState(new Date());
   const [appliedRecs, setAppliedRecs] = useState(new Set());
   const [dismissedRecs, setDismissedRecs] = useState(new Set());
 
