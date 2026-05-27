@@ -173,12 +173,12 @@ html, body {
 body {
   min-height: 100vh;
   background-color: var(--bg-app-1);
-  /* Atmospheric orbs: brand green · brand gold · brand blue */
+  /* Atmospheric orbs: Podemos green · amarelo · azul */
   background-image:
-    radial-gradient(ellipse 900px 600px at -5% 0%,   rgba(22,163,74,0.18)   0%, transparent 65%),
-    radial-gradient(ellipse 700px 500px at 110% -5%,  rgba(212,160,23,0.15)  0%, transparent 60%),
-    radial-gradient(ellipse 1000px 700px at 50% 110%, rgba(26,63,191,0.20)   0%, transparent 65%),
-    radial-gradient(ellipse 600px 400px at 85% 45%,   rgba(22,163,74,0.08)   0%, transparent 55%);
+    radial-gradient(ellipse 900px 600px at -5% 0%,    rgba(108,180,84,0.20)  0%, transparent 65%),
+    radial-gradient(ellipse 700px 500px at 110% -5%,  rgba(255,213,0,0.13)   0%, transparent 60%),
+    radial-gradient(ellipse 1000px 700px at 50% 110%, rgba(58,88,157,0.22)   0%, transparent 65%),
+    radial-gradient(ellipse 600px 400px at 85% 45%,   rgba(108,180,84,0.07)  0%, transparent 55%);
   background-attachment: fixed;
 }
 
@@ -1163,10 +1163,17 @@ button { font-family: inherit; cursor: pointer; }
   gap: 24px;
   padding: 24px 28px;
   background: linear-gradient(135deg,
-    rgba(22,163,74,0.12) 0%,
-    rgba(255,255,255,0.05) 50%,
-    rgba(26,63,191,0.08) 100%) !important;
-  border-color: rgba(22,163,74,0.25) !important;
+    rgba(108,180,84,0.18) 0%,
+    rgba(255,255,255,0.042) 50%,
+    rgba(58,88,157,0.12) 100%) !important;
+  border-color: rgba(108,180,84,0.32) !important;
+}
+body[data-tone="podemos"] .hero-spend {
+  background: linear-gradient(135deg,
+    rgba(108,180,84,0.16) 0%,
+    rgba(255,255,255,0.97) 50%,
+    rgba(58,88,157,0.10) 100%) !important;
+  border-color: rgba(108,180,84,0.35) !important;
 }
 .hero-spend-left { display: flex; flex-direction: column; gap: 6px; }
 .hero-spend-value {
@@ -1177,7 +1184,7 @@ button { font-family: inherit; cursor: pointer; }
   line-height: 1;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 24px rgba(22,163,74,0.3), 0 0 60px rgba(22,163,74,0.12);
+  text-shadow: 0 2px 24px rgba(108,180,84,0.38), 0 0 60px rgba(108,180,84,0.16);
 }
 .hero-spend-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .hero-spend-right { flex-shrink: 0; opacity: 0.95; }
@@ -1564,6 +1571,29 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 11.5px;
   color: var(--text-tertiary);
   line-height: 1.4;
+}
+
+/* ── KPI card — per-card accent gradient (--card-accent injected via inline style) ── */
+.card.kpi {
+  background:
+    linear-gradient(135deg,
+      color-mix(in oklch, var(--card-accent, var(--accent-cold)) 14%, transparent) 0%,
+      rgba(255,255,255,0.042) 55%
+    );
+  border-top: 2px solid color-mix(in oklch, var(--card-accent, var(--accent-cold)) 38%, transparent);
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s, background 0.3s;
+}
+body[data-tone="podemos"] .card.kpi {
+  background:
+    linear-gradient(135deg,
+      color-mix(in oklch, var(--card-accent, var(--accent-cold)) 10%, white) 0%,
+      rgba(255,255,255,0.95) 55%
+    ) !important;
+  border-top: 2px solid color-mix(in oklch, var(--card-accent, var(--accent-cold)) 45%, transparent) !important;
+}
+.kpi-icon-chip {
+  width: 34px; height: 34px;
+  border-radius: 10px;
 }
 
 /* delta (kept for hero spend card) */
@@ -3120,7 +3150,8 @@ function Sparkline({ values, accent = "var(--accent-cold)", height = 28, width =
     <svg width={width} height={height} style={{ display: "block", overflow: "visible" }}>
       <defs>
         <linearGradient id={gid} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.35" />
+          <stop offset="0%" stopColor={accent} stopOpacity="0.50" />
+          <stop offset="75%" stopColor={accent} stopOpacity="0.08" />
           <stop offset="100%" stopColor={accent} stopOpacity="0" />
         </linearGradient>
       </defs>
@@ -3240,13 +3271,16 @@ function daysBetween(a, b) {
 // ───────────────────────────── KPI ─────────────────────────────
 function KpiCard({ label, value, sub, icon, iconColor }) {
   return (
-    <div className="card kpi">
+    <div
+      className="card kpi"
+      style={iconColor ? { '--card-accent': iconColor } : undefined}
+    >
       <div className="kpi-row">
         <div className="kpi-label">{label}</div>
         {icon && (
           <div
             className="kpi-icon-chip"
-            style={iconColor ? { color: iconColor, background: `color-mix(in oklch, ${iconColor} 18%, transparent)` } : null}
+            style={iconColor ? { color: iconColor, background: `color-mix(in oklch, ${iconColor} 20%, transparent)` } : null}
           >
             {icon}
           </div>
@@ -3654,11 +3688,12 @@ function PerformanceTable({ data, onSelect, selectedId }) {
 }
 
 // ───────────────────────────── Trend Chart ─────────────────────────────
+// Primary: Podemos palette — verde · azul · amarelo
 const CHART_PALETTE = [
-  "#3B82F6", "#F59E0B", "#EF4444", "#10B981", "#8B5CF6",
-  "#06B6D4", "#F97316", "#EC4899", "#84CC16", "#14B8A6",
-  "#A78BFA", "#FB923C", "#34D399", "#60A5FA", "#FBBF24",
-  "#F472B6", "#4ADE80", "#38BDF8",
+  "#6CB454", "#3A589D", "#FFD500", "#EC4899", "#8B5CF6",
+  "#06B6D4", "#F97316", "#34D399", "#60A5FA", "#FBBF24",
+  "#A78BFA", "#FB923C", "#4ADE80", "#38BDF8", "#F472B6",
+  "#EF4444", "#14B8A6", "#10B981",
 ];
 
 function TrendChart({ dailySeries, metric, accounts, selectedAccount }) {
@@ -3832,12 +3867,13 @@ function TrendChart({ dailySeries, metric, accounts, selectedAccount }) {
             <g key={s.account_id}>
               <defs>
                 <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity="0.15" />
+                  <stop offset="0%" stopColor={color} stopOpacity="0.38" />
+                  <stop offset="70%" stopColor={color} stopOpacity="0.08" />
                   <stop offset="100%" stopColor={color} stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d={areaPath} fill={`url(#${id})`} />
-              <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               {hoverIdx !== null && s.points[hoverIdx] != null && (
                 <circle
                   key={`${s.account_id}-hover`}
@@ -5411,21 +5447,21 @@ function Dashboard() {
     [daily, accounts, currentRange.start, currentRange.end, selectedAccount]
   );
 
-  // apply meta override if set; align spend with selected period (consistent with hero + breakdown)
+  // apply meta override if set; "Meta mensal" always shows CURRENT CALENDAR MONTH spend,
+  // regardless of selected period — so 60d/90d/ytd periods don't inflate the monthly card.
   const monthlyWithOverride = useMemo(() => {
     const key = selectedAccount || "__consolidated";
     const override = metaOverrides[key];
     const meta = override || agg.monthly.meta;
-    // Use period spend (agg.totals.spend) so all three cards — Gasto no período,
-    // Gasto por conta e Meta mensal — mostram o mesmo número de gasto.
-    const spend = agg.totals.spend;
+    // Always use the current-month spend (not total period spend).
+    const spend = agg.monthly.spend;
     return {
       ...agg.monthly,
       meta,
       spend,
       progress: meta > 0 ? spend / meta : 0,
     };
-  }, [agg.monthly, agg.totals.spend, metaOverrides, selectedAccount]);
+  }, [agg.monthly, metaOverrides, selectedAccount]);
 
   // auto-refresh: countdown 5 min, refreshes Supabase data at zero
   useEffect(() => {
@@ -5580,7 +5616,7 @@ function Dashboard() {
             </div>
           </div>
           <div className="hero-spend-right">
-            <Sparkline values={agg.dailySeries.map((d) => d.spend)} accent="var(--accent-cold)" height={56} width={220} />
+            <Sparkline values={agg.dailySeries.map((d) => d.spend)} accent="var(--accent-success)" height={56} width={220} />
           </div>
         </div>
 
