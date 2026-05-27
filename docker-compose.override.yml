@@ -1,0 +1,9 @@
+version: '3.8'
+
+# Development overrides — source-mount for hot reload.
+# This file is loaded automatically by docker-compose on local machines.
+# It is NOT used in production (VPS deploy uses docker-compose.yml only).
+services:
+  backend:
+    volumes:
+      - ./backend:/app

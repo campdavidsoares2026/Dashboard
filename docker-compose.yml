@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./cpee_dashboard.db}
+      - MODO_COLETA=${MODO_COLETA:-simulado}
+      - META_ACCESS_TOKEN=${META_ACCESS_TOKEN}
+      - META_AD_ACCOUNT_IDS=${META_AD_ACCOUNT_IDS}
+      - EXPORT_API_KEY=${EXPORT_API_KEY}
+    networks:
+      - cpee-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    expose:
+      - "3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=/api
+      - API_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - cpee-network
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"  # SSL configured in Task 7 (nginx.conf updated on VPS)
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - cpee-network
+    restart: unless-stopped
+
+networks:
+  cpee-network:
+    driver: bridge

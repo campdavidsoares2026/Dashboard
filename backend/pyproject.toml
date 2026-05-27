@@ -1,0 +1,45 @@
+[project]
+name = "cpee-dashboard-backend"
+version = "0.1.0"
+description = "CPEE Dashboard Backend API"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+addopts = [
+    "--strict-markers",
+    "--tb=short",
+    "--cov=app",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "--cov-fail-under=70"
+]
+markers = [
+    "asyncio: marks tests as async",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "slow: marks tests as slow"
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/venv/*",
+    "*/site-packages/*",
+    "*/__pycache__/*",
+    "*/tests/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

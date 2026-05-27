@@ -1,0 +1,88 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ${{ secrets.DB_USER || 'cpee_user' }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD || 'cpee_password' }}
+          POSTGRES_DB: cpee_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          cd backend
+          pytest tests/ --cov=app --cov-report=html --cov-report=term-missing --cov-fail-under=70
+        env:
+          DATABASE_URL: postgresql://${{ secrets.DB_USER || 'cpee_user' }}:${{ secrets.DB_PASSWORD || 'cpee_password' }}@localhost:5432/cpee_test
+          ENVIRONMENT: test
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: backend/htmlcov/
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const coveragePath = './backend/htmlcov/status.json';
+            if (fs.existsSync(coveragePath)) {
+              const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+              const coveragePercent = Math.round(coverage.coverage * 100) / 100;
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `✅ Backend tests passed\n\n**Coverage:** ${coveragePercent}%`
+              });
+            }

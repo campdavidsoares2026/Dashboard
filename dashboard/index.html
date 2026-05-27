@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPEE Dashboard — Campanha Eleitoral</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:       #f5f4f0;
+    --surface:  #ffffff;
+    --border:   rgba(0,0,0,0.09);
+    --text:     #1a1a18;
+    --muted:    #6b6b68;
+    --hint:     #9c9a92;
+    --quente:   #D85A30;
+    --morno:    #BA7517;
+    --frio:     #378ADD;
+    --radius:   12px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  header { background: var(--surface); border-bottom: 1px solid var(--border);
+           padding: 14px 28px; display: flex; align-items: center;
+           justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+  header span { font-size: 12px; color: var(--muted); }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+             gap: 14px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 680px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  /* ── Cards ─────────────────────────────────────────────────────────────── */
+  .card { background: var(--surface); border: 1px solid var(--border);
+          border-radius: var(--radius); padding: 18px 20px; }
+  .card-label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+                letter-spacing: .06em; margin-bottom: 6px; }
+  .card-val { font-size: 26px; font-weight: 600; line-height: 1.1; }
+  .card-sub  { font-size: 12px; color: var(--hint); margin-top: 3px; }
+
+  /* ── Temperatura badges ─────────────────────────────────────────────────── */
+  .badge { display: inline-block; font-size: 11px; font-weight: 600;
+           padding: 3px 9px; border-radius: 20px; }
+  .b-quente { background: #FAECE7; color: #993C1D; }
+  .b-morno  { background: #FAEEDA; color: #854F0B; }
+  .b-frio   { background: #E6F1FB; color: #185FA5; }
+
+  /* ── Tabela ranking ─────────────────────────────────────────────────────── */
+  .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px;
+             padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; font-size: 11px; color: var(--muted);
+             text-transform: uppercase; letter-spacing: .05em;
+             padding: 0 8px 8px; }
+  thead th:not(:first-child) { text-align: right; }
+  tbody tr { border-top: 1px solid var(--border); cursor: pointer;
+             transition: background .1s; }
+  tbody tr:hover { background: var(--bg); }
+  tbody td { padding: 10px 8px; color: var(--text); }
+  tbody td:not(:first-child):not(:last-child) { text-align: right; color: var(--muted); }
+  .eem-cell { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  .eem-bar { height: 5px; border-radius: 3px; min-width: 4px; }
+
+  /* ── Filtros ─────────────────────────────────────────────────────────────── */
+  .filtros { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .filtro-btn { font-size: 12px; padding: 5px 14px; border-radius: 20px;
+                border: 1px solid var(--border); background: transparent;
+                cursor: pointer; color: var(--muted); transition: all .15s; }
+  .filtro-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+  /* ── Botão coletar ────────────────────────────────────────────────────────── */
+  .btn-coletar { font-size: 13px; padding: 8px 18px; border-radius: 8px;
+                 border: 1px solid var(--border); background: var(--text);
+                 color: #fff; cursor: pointer; transition: opacity .15s; }
+  .btn-coletar:hover { opacity: .85; }
+  .btn-coletar:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ── Modo toggle ────────────────────────────────────────────────────────── */
+  .modo-toggle { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+  .modo-toggle select { font-size: 12px; padding: 4px 8px; border-radius: 6px;
+                         border: 1px solid var(--border); background: var(--surface); }
+  /* ── Chart wrapper ─────────────────────────────────────────────────────── */
+  .chart-wrap { position: relative; width: 100%; }
+  .chart-wrap canvas { width: 100% !important; }
+
+  /* ── Sparkline (histórico inline) ─────────────────────────────────────── */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text);
+           color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13px;
+           opacity: 0; transform: translateY(8px); transition: all .3s; z-index: 100; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .btn-autorefresh { font-size: 12px; padding: 5px 12px; border-radius: 6px;
+                     border: 1px solid var(--border); background: var(--surface);
+                     cursor: pointer; display: flex; align-items: center; gap: 6px;
+                     color: var(--muted); transition: all .2s; }
+  .btn-autorefresh.ativo { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
+  .btn-autorefresh .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hint); }
+  .btn-autorefresh.ativo .dot { background: #4caf50; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CPEE Dashboard — Campanha Eleitoral</h1>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="modo-toggle">
+      Período:
+      <select id="periodo-select">
+        <option value="last_7d">Últimos 7 dias</option>
+        <option value="last_14d">Últimos 14 dias</option>
+        <option value="last_28d">Últimos 28 dias</option>
+        <option value="last_30d">Últimos 30 dias</option>
+        <option value="last_90d">Últimos 90 dias</option>
+        <option value="this_month">Este mês</option>
+        <option value="last_month">Mês passado</option>
+        <option value="maximum">Máximo</option>
+      </select>
+    </div>
+    <div class="modo-toggle">
+      Modo:
+      <select id="modo-select">
+        <option value="real" selected>Meta Ads real</option>
+        <option value="simulado">Simulado</option>
+      </select>
+    </div>
+    <button class="btn-coletar" id="btn-coletar" onclick="coletar()">
+      Atualizar dados
+    </button>
+    <button class="btn-autorefresh" id="btn-autorefresh" onclick="toggleAutoRefresh()">
+      <span class="dot"></span>
+      <span id="ar-label">Auto-refresh</span>
+    </button>
+    <span id="ultima-coleta" style="font-size:12px;color:var(--hint)"></span>
+  </div>
+</header>
+
+<main>
+  <!-- Cards de resumo -->
+  <div class="grid-4" id="cards-resumo">
+    <div class="card"><p class="card-label">Total investido</p>
+      <p class="card-val" id="c-gasto">—</p><p class="card-sub">R$ alocados</p></div>
+    <div class="card"><p class="card-label">CPEE médio</p>
+      <p class="card-val" id="c-cpee">—</p><p class="card-sub">R$ / engaj. qualificado</p></div>
+    <div class="card"><p class="card-label">Cidades quentes</p>
+      <p class="card-val" id="c-quentes" style="color:var(--quente)">—</p>
+      <p class="card-sub">EEM ≥ 2,0</p></div>
+    <div class="card"><p class="card-label">Cidades frias</p>
+      <p class="card-val" id="c-frios" style="color:var(--frio)">—</p>
+      <p class="card-sub">EEM &lt; 0,8</p></div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Gráfico bolhas EEM x Eleitores -->
+    <div class="card">
+      <h2>EEM × Eleitores (tamanho = gasto)</h2>
+      <div class="chart-wrap" style="height:300px"><canvas id="chart-bubble"></canvas></div>
+    </div>
+
+    <!-- Distribuição de temperatura -->
+    <div class="card">
+      <h2>Distribuição de temperatura</h2>
+      <div class="chart-wrap" style="height:180px"><canvas id="chart-donut"></canvas></div>
+      <div id="legend-donut" style="display:flex;gap:16px;margin-top:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;"></div>
+    </div>
+  </div>
+
+  <!-- Ranking completo -->
+  <div class="card">
+    <h2>Ranking por município</h2>
+    <div class="filtros">
+      <button class="filtro-btn active" onclick="filtrar('todos', this)">Todos</button>
+      <button class="filtro-btn" onclick="filtrar('quente', this)">🔥 Quentes</button>
+      <button class="filtro-btn" onclick="filtrar('morno',  this)">🟡 Mornos</button>
+      <button class="filtro-btn" onclick="filtrar('frio',   this)">🔵 Frios</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Cidade</th><th>Eleitores</th>
+            <th>Gasto</th><th>Engaj. pond.</th>
+            <th>CPEE pond.</th><th>EEM</th><th>Temp.</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-ranking"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let dadosRanking = [];
+  let bubbleChart = null;
+  let donutChart  = null;
+
+  const COR = { quente: '#D85A30', morno: '#BA7517', frio: '#378ADD' };
+
+  function fmt(n, prefix='', dec=2) {
+    if (n == null || isNaN(n)) return '—';
+    return prefix + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+
+  function toast(msg, dur=2500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), dur);
+  }
+
+  async function fetchJSON(url) {
+    const r = await fetch(url);
+    return r.json();
+  }
+
+  async function carregarResumo() {
+    const d = await fetchJSON('/api/resumo');
+    document.getElementById('c-gasto').textContent  = fmt(d.total_gasto, 'R$ ', 0);
+    document.getElementById('c-cpee').textContent   = fmt(d.cpee_medio, 'R$ ');
+    document.getElementById('c-quentes').textContent = d.quentes ?? '—';
+    document.getElementById('c-frios').textContent   = d.frios   ?? '—';
+  }
+
+  async function carregarRanking() {
+    dadosRanking = await fetchJSON('/api/ranking');
+    renderRanking(dadosRanking);
+    renderBubble(dadosRanking);
+    await carregarDistribuicao();
+  }
+
+  function renderRanking(dados) {
+    const tbody = document.getElementById('tbody-ranking');
+    if (!dados.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--hint)">Sem dados. Clique em "Atualizar dados".</td></tr>'; return; }
+    const maxEem = Math.max(...dados.map(d => d.eem || 0), 0.001);
+
+    tbody.innerHTML = dados.map((d, i) => {
+      const cor     = COR[d.temperatura] || '#888';
+      const barW    = Math.round(((d.eem || 0) / maxEem) * 80);
+      const badgeC  = `b-${d.temperatura}`;
+      return `<tr onclick="verHistorico('${d.uf}','${d.cidade}')">
+        <td style="color:var(--hint);font-size:12px">${i+1}</td>
+        <td><strong>${d.cidade}</strong> <span style="font-size:11px;color:var(--hint)">${d.uf}</span></td>
+        <td>${Number(d.eleitores||0).toLocaleString('pt-BR')}</td>
+        <td>${fmt(d.gasto,'R$ ',0)}</td>
+        <td>${Number(Math.round(d.eng_ponderado||0)).toLocaleString('pt-BR')}</td>
+        <td>${fmt(d.cpee_ponderado,'R$ ')}</td>
+        <td>
+          <div class="eem-cell">
+            <div class="eem-bar" style="width:${barW}px;background:${cor}"></div>
+            <span style="color:${cor};font-weight:600;min-width:36px">${fmt(d.eem,'',3)}</span>
+          </div>
+        </td>
+        <td><span class="badge ${badgeC}">${d.temperatura}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function filtrar(temp, btn) {
+    document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filtrado = temp === 'todos' ? dadosRanking : dadosRanking.filter(d => d.temperatura === temp);
+    renderRanking(filtrado);
+  }
+
+  function renderBubble(dados) {
+    if (bubbleChart) bubbleChart.destroy();
+    const datasets = dados.map(d => ({
+      label: d.cidade,
+      data: [{
+        x: (d.eleitores || 0) / 1000,
+        y: parseFloat((d.eem || 0).toFixed(3)),
+        r: Math.max(5, Math.sqrt((d.gasto || 0) / 100)),
+      }],
+      backgroundColor: (COR[d.temperatura] || '#888') + 'AA',
+      borderColor:     COR[d.temperatura] || '#888',
+      borderWidth: 1,
+    }));
+
+    bubbleChart = new Chart(document.getElementById('chart-bubble'), {
+      type: 'bubble',
+      data: { datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: 16 },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: {
+            label: ctx => `${ctx.dataset.label}: EEM ${ctx.parsed.y.toFixed(3)} | ${(ctx.parsed.x).toFixed(0)}k eleitores`
+          }}
+        },
+        scales: {
+          x: { title: { display: true, text: 'Eleitores (mil)', color: '#9c9a92', font: { size: 11 } }, ticks: { color: '#9c9a92' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+          y: { title: { display: true, text: 'EEM', color: '#9c9a92', font: { size: 11 } }, ticks: { color: '#9c9a92' }, grid: { color: 'rgba(0,0,0,0.05)' }, min: 0 },
+        }
+      }
+    });
+  }
+
+  async function carregarDistribuicao() {
+    const d = await fetchJSON('/api/distribuicao');
+    if (donutChart) donutChart.destroy();
+    const total = (d.quente||0) + (d.morno||0) + (d.frio||0);
+    donutChart = new Chart(document.getElementById('chart-donut'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Quente','Morno','Frio'],
+        datasets: [{ data: [d.quente||0, d.morno||0, d.frio||0],
+          backgroundColor: ['#D85A30','#BA7517','#378ADD'],
+          borderWidth: 0, hoverOffset: 6 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '68%',
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: ctx => ` ${ctx.label}: ${ctx.parsed} (${total > 0 ? Math.round(ctx.parsed/total*100) : 0}%)`
+        }}}
+      }
+    });
+
+    document.getElementById('legend-donut').innerHTML = [
+      { label:'Quentes', val: d.quente||0, cor:'#D85A30' },
+      { label:'Mornos',  val: d.morno||0,  cor:'#BA7517' },
+      { label:'Frios',   val: d.frio||0,   cor:'#378ADD' },
+    ].map(l => `<span style="display:flex;align-items:center;gap:5px">
+      <span style="width:10px;height:10px;border-radius:2px;background:${l.cor}"></span>
+      ${l.label}: <strong>${l.val}</strong>
+    </span>`).join('');
+  }
+
+  async function verHistorico(uf, cidade) {
+    const dados = await fetchJSON(`/api/historico/${uf}/${cidade}?dias=10`);
+    if (!dados.length) { toast('Sem histórico para ' + cidade); return; }
+    const ultimo = dados[0];
+    toast(`${cidade}: EEM ${(ultimo.eem||0).toFixed(3)} | ${ultimo.temperatura}`);
+  }
+
+  async function coletar() {
+    const btn  = document.getElementById('btn-coletar');
+    const modo = document.getElementById('modo-select').value;
+    btn.disabled = true;
+    btn.textContent = 'Coletando...';
+    toast('Iniciando coleta de dados...');
+    try {
+      const r = await fetch('/api/coletar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modo, periodo: document.getElementById('periodo-select').value })
+      });
+      const data = await r.json();
+      if (data.ok) {
+        toast(`✓ ${data.cidades} cidades atualizadas`);
+        document.getElementById('ultima-coleta').textContent =
+          'Última: ' + new Date().toLocaleTimeString('pt-BR');
+        await carregarResumo();
+        await carregarRanking();
+      } else {
+        toast('Erro: ' + (data.erro || 'verifique o terminal'));
+      }
+    } catch(e) {
+      toast('Falha na requisição — verifique o servidor');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Atualizar dados';
+  }
+
+  // Auto-refresh
+  const AR_INTERVAL = 5 * 60; // segundos
+  let arTimer = null;
+  let arCountdown = AR_INTERVAL;
+
+  function toggleAutoRefresh() {
+    const btn = document.getElementById('btn-autorefresh');
+    if (arTimer) {
+      clearInterval(arTimer);
+      arTimer = null;
+      btn.classList.remove('ativo');
+      document.getElementById('ar-label').textContent = 'Auto-refresh';
+    } else {
+      arCountdown = AR_INTERVAL;
+      atualizarLabel();
+      arTimer = setInterval(async () => {
+        arCountdown--;
+        if (arCountdown <= 0) {
+          arCountdown = AR_INTERVAL;
+          await carregarResumo();
+          await carregarRanking();
+          document.getElementById('ultima-coleta').textContent =
+            'Última: ' + new Date().toLocaleTimeString('pt-BR');
+        }
+        atualizarLabel();
+      }, 1000);
+      btn.classList.add('ativo');
+    }
+  }
+
+  function atualizarLabel() {
+    const m = String(Math.floor(arCountdown / 60)).padStart(2, '0');
+    const s = String(arCountdown % 60).padStart(2, '0');
+    document.getElementById('ar-label').textContent = `${m}:${s}`;
+  }
+
+  // Init
+  (async () => {
+    await carregarResumo();
+    await carregarRanking();
+  })();
+</script>
+</body>
+</html>
