@@ -1995,8 +1995,13 @@ button:focus-visible {
 
 </style>
 <script>
-  // Backend base — production FastAPI on Vercel
+  // Backend base — FastAPI fallback (Supabase direct is now the default)
   window.__API_BASE__ = "https://backend-psi-orpin-13.vercel.app";
+  // Default data source: Supabase direct (cron daily_report.py keeps it fresh at 09:00 daily)
+  window.__SUPA_DEFAULT__ = {
+    url: "https://ygbrgtuddtisoowwdxqn.supabase.co",
+    key: "sb_publishable_dD7pAtkSiOk-p83TEUdC0A_9RSr0mto"
+  };
   window.__TWEAKS__ = /*EDITMODE-BEGIN*/{
     "accent_hot": "#EF4444",
     "accent_warm": "#F59E0B",
@@ -4048,18 +4053,21 @@ function isBadConfigUrl(url) {
 }
 
 function getSupaConfig() {
+  // Hardcoded default — points at the Supabase instance the daily cron writes to.
+  const SUPA_DEFAULT = (typeof window !== "undefined" && window.__SUPA_DEFAULT__) || null;
   try {
     const stored = JSON.parse(localStorage.getItem(SUPA_CONFIG_KEY) || "{}") || {};
     // Auto-reset stale insecure configs from past dev sessions
     if (stored.url && isBadConfigUrl(stored.url)) {
-      const fresh = { url: API_BASE, key: "backend" };
+      const fresh = SUPA_DEFAULT || { url: API_BASE, key: "backend" };
       try { localStorage.setItem(SUPA_CONFIG_KEY, JSON.stringify(fresh)); } catch {}
       return fresh;
     }
-    if (stored.url || stored.key) return stored;
+    // If user has both URL and key set, honor it; otherwise apply default
+    if (stored.url && stored.key) return stored;
   } catch {}
-  // Default: connect via backend
-  return { url: API_BASE, key: "backend" };
+  // Default: Supabase direct (cron-fed) → falls back to backend if no SUPA_DEFAULT
+  return SUPA_DEFAULT || { url: API_BASE, key: "backend" };
 }
 
 function saveSupaConfig(cfg) {
