@@ -51,9 +51,83 @@ body::before {
   height: 100vh;
   width: 100vw;
   display: grid;
-  grid-template-rows: 66px 1fr 118px 1fr 64px;
+  grid-template-rows: 66px 44px 1fr 72px 118px 1fr 64px;
   gap: 8px;
   padding: 10px;
+}
+
+/* ─────── PERIOD BAR ─────── */
+.period-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.038);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 0 16px;
+  overflow: hidden;
+}
+.period-lbl {
+  font-size: 10px; font-weight: 700; color: var(--t2);
+  text-transform: uppercase; letter-spacing: .07em;
+  white-space: nowrap;
+}
+.date-inp {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--t1);
+  font-family: var(--mono); font-size: 12px;
+  padding: 3px 8px; cursor: pointer;
+  color-scheme: dark;
+}
+.period-arr { color: var(--t3); font-size: 13px; }
+.period-sep-v { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; margin: 0 4px; }
+.preset-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--t2); font-family: var(--font);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  padding: 4px 10px; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.preset-btn:hover, .preset-btn.active {
+  background: rgba(108,180,84,.18);
+  border-color: rgba(108,180,84,.4);
+  color: var(--green);
+}
+.apply-btn {
+  background: rgba(108,180,84,.15);
+  border: 1px solid rgba(108,180,84,.35);
+  border-radius: 6px;
+  color: var(--green); font-family: var(--font);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  padding: 4px 12px; cursor: pointer;
+  transition: background .15s;
+}
+.apply-btn:hover { background: rgba(108,180,84,.28); }
+.period-tag {
+  font-size: 9px; color: var(--t3); font-weight: 500;
+  padding: 1px 5px; background: rgba(255,255,255,0.06);
+  border-radius: 4px; margin-left: 4px;
+}
+
+/* ─────── METRICS ROW ─────── */
+.row-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.metric-card {
+  display: flex; flex-direction: column; justify-content: center;
+  gap: 2px; padding: 10px 14px;
+}
+.metric-val {
+  font-size: clamp(18px, 2vw, 28px);
+  font-weight: 800; font-family: var(--mono);
+  letter-spacing: -.02em; color: var(--t1);
+  line-height: 1;
 }
 
 /* ─────── HEADER ─────── */
@@ -275,6 +349,7 @@ body::before {
 .adot.warn  { background: var(--yellow); }
 .aname { font-size: 12px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .acpee { font-family: var(--mono); font-size: 11px; color: var(--t2); font-weight: 600; }
+.aspend { font-size: 10px; color: var(--yellow); font-weight: 700; font-family: var(--mono); margin-top: 1px; }
 
 /* Gasto total */
 .total-card {
@@ -456,6 +531,20 @@ body::before {
     </div>
   </header>
 
+  <!-- ═══ PERIOD SELECTOR ═══ -->
+  <div class="period-bar">
+    <span class="period-lbl">Período</span>
+    <input type="date" id="date-from" class="date-inp">
+    <span class="period-arr">→</span>
+    <input type="date" id="date-to" class="date-inp">
+    <div class="period-sep-v"></div>
+    <button class="preset-btn active" id="btn-month" onclick="setPeriod('month')">Mês</button>
+    <button class="preset-btn" id="btn-30d" onclick="setPeriod('30d')">30d</button>
+    <button class="preset-btn" id="btn-7d" onclick="setPeriod('7d')">7d</button>
+    <button class="preset-btn" id="btn-today" onclick="setPeriod('today')">Hoje</button>
+    <button class="apply-btn" onclick="applyCustomPeriod()">Aplicar</button>
+  </div>
+
   <!-- ═══ ROW 1 — BIG KPIs ═══ -->
   <div class="row1">
 
@@ -498,6 +587,27 @@ body::before {
       </div>
     </div>
 
+  </div>
+
+  <!-- ═══ ROW MÉTRICAS ═══ -->
+  <div class="row-metrics">
+    <div class="card metric-card">
+      <div class="lbl">Impressões <span class="period-tag" id="period-tag"></span></div>
+      <div class="metric-val" id="impressoes-val">—</div>
+    </div>
+    <div class="card metric-card">
+      <div class="lbl">Alcance</div>
+      <div class="metric-val" id="alcance-val">—</div>
+    </div>
+    <div class="card metric-card">
+      <div class="lbl">ThruPlay</div>
+      <div class="metric-val" id="thruplay-val">—</div>
+      <div class="sub" style="font-size:9px;color:var(--t3);margin-top:2px">vídeos assistidos até o fim</div>
+    </div>
+    <div class="card metric-card">
+      <div class="lbl">Cliques no Link</div>
+      <div class="metric-val" id="cliques-val">—</div>
+    </div>
   </div>
 
   <!-- ═══ ROW 2 — SECONDARY ═══ -->
@@ -623,32 +733,97 @@ const HDR = {
   Accept: "application/json",
 };
 
+/* ═══════════════════════════════════════════
+   PERÍODO SELECIONADO
+═══════════════════════════════════════════ */
+const _today0 = new Date().toISOString().slice(0, 10);
+let periodStart = _today0.slice(0, 8) + "01"; // início do mês atual
+let periodEnd   = _today0;
+
+function _setActivePreset(id) {
+  ["btn-month","btn-30d","btn-7d","btn-today"].forEach(b => {
+    const el = document.getElementById(b);
+    if (el) el.classList.toggle("active", b === id);
+  });
+}
+
+function setPeriod(preset) {
+  const today = new Date().toISOString().slice(0, 10);
+  switch (preset) {
+    case "month":
+      periodStart = today.slice(0, 8) + "01";
+      periodEnd   = today;
+      break;
+    case "30d":
+      periodStart = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+      periodEnd   = today;
+      break;
+    case "7d":
+      periodStart = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+      periodEnd   = today;
+      break;
+    case "today":
+      periodStart = today;
+      periodEnd   = today;
+      break;
+  }
+  const fEl = document.getElementById("date-from");
+  const tEl = document.getElementById("date-to");
+  if (fEl) fEl.value = periodStart;
+  if (tEl) tEl.value = periodEnd;
+  _setActivePreset("btn-" + (preset === "month" ? "month" : preset));
+  loadAndRender();
+}
+
+function applyCustomPeriod() {
+  const from = document.getElementById("date-from")?.value;
+  const to   = document.getElementById("date-to")?.value;
+  if (from && to && from <= to) {
+    periodStart = from;
+    periodEnd   = to;
+    _setActivePreset(null); // nenhum preset ativo
+    loadAndRender();
+  }
+}
+
 async function fetchData() {
   const today      = new Date().toISOString().slice(0, 10);
   const monthStart = today.slice(0, 8) + "01";
   const chartStart = new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10);
 
-  const [cR, smR, scR, crR] = await Promise.all([
+  // snapsPeriod = período selecionado (para métricas impressões/alcance/thruplay/cliques)
+  // snapsMonth  = sempre mês atual (para CPEE, Meta Mensal, Gasto)
+  const samePeriod = periodStart === monthStart && periodEnd === today;
+
+  const fetches = [
     fetch(`${SUPA_URL}/rest/v1/metricas_conta?select=*&order=executado_em.desc`, { headers: HDR }),
     fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=*&data=gte.${monthStart}&order=data.asc`, { headers: HDR }),
     fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=data,spend,leads,eq,account_id&data=gte.${chartStart}&order=data.asc`, { headers: HDR }),
     fetch(`${SUPA_URL}/rest/v1/criativos_performance?select=*&order=cpee.asc&limit=1`, { headers: HDR }),
-  ]);
+    samePeriod ? null :
+      fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=impressoes,alcance,cliques,thruplay,data,account_id&data=gte.${periodStart}&data=lte.${periodEnd}&order=data.asc`, { headers: HDR }),
+  ];
+
+  const [cR, smR, scR, crR, spR] = await Promise.all(fetches);
 
   if (!cR.ok) throw new Error(`API ${cR.status}`);
 
+  const snapsMonthData = await smR.json();
+  const snapsPeriodData = samePeriod ? snapsMonthData : await spR.json();
+
   return {
-    contas:      await cR.json(),
-    snapsMonth:  await smR.json(),
-    snapsChart:  await scR.json(),
-    criativos:   await crR.json(),
+    contas:       await cR.json(),
+    snapsMonth:   snapsMonthData,
+    snapsChart:   await scR.json(),
+    criativos:    await crR.json(),
+    snapsPeriod:  snapsPeriodData,
   };
 }
 
 /* ═══════════════════════════════════════════
    COMPUTE
 ═══════════════════════════════════════════ */
-function compute({ contas, snapsMonth, snapsChart, criativos }) {
+function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
   const today = new Date().toISOString().slice(0, 10);
   const now   = new Date();
 
@@ -712,11 +887,18 @@ function compute({ contas, snapsMonth, snapsChart, criativos }) {
   const winner = (criativos || [])[0] || null;
   const cpl_mes = leads_mes > 0 ? gasto_mes / leads_mes : 0;
 
+  // Métricas do período selecionado
+  const impressoes_per = (snapsPeriod || snapsMonth || []).reduce((a,b) => a + (b.impressoes || 0), 0);
+  const alcance_per    = (snapsPeriod || snapsMonth || []).reduce((a,b) => a + (b.alcance    || 0), 0);
+  const cliques_per    = (snapsPeriod || snapsMonth || []).reduce((a,b) => a + (b.cliques    || 0), 0);
+  const thruplay_per   = (snapsPeriod || snapsMonth || []).reduce((a,b) => a + (b.thruplay   || 0), 0);
+
   return {
     active, byAcct, gasto_hoje, gasto_mes, leads_mes, eq_mes,
     cpee, classif, cpeeColor, meta, budget_d,
     dimMonth, dom, expPct, actPct, pacing,
     daysEl, chartDays, winner, cpl_mes,
+    impressoes_per, alcance_per, cliques_per, thruplay_per,
   };
 }
 
@@ -751,6 +933,16 @@ function render(m) {
   set("cpl-val", m.cpl_mes > 0 ? `CPL ${BRLf(m.cpl_mes)}` : "CPL —");
   set("eq-val", compact(m.eq_mes));
 
+  // ── MÉTRICAS DE PERÍODO ──
+  set("impressoes-val", compact(m.impressoes_per));
+  set("alcance-val",    compact(m.alcance_per));
+  set("thruplay-val",   compact(m.thruplay_per));
+  set("cliques-val",    compact(m.cliques_per));
+  // Tag de período
+  const isMonth = periodStart === new Date().toISOString().slice(0,8) + "01" && periodEnd === new Date().toISOString().slice(0,10);
+  const tagEl = document.getElementById("period-tag");
+  if (tagEl) tagEl.textContent = isMonth ? "" : `${periodStart} → ${periodEnd}`;
+
   // ── ACCOUNTS ──
   const acEl = document.getElementById("accts-card");
   const pills = m.active.map(c => {
@@ -764,6 +956,7 @@ function render(m) {
       <div class="adot ${dot}"></div>
       <div class="aname">${shortNome}</div>
       <div class="acpee">CPEE ${cpeeStr}</div>
+      ${agg.spend > 0 ? `<div class="aspend">${BRL(agg.spend)}</div>` : ""}
     </div>`;
   }).join("");
   acEl.innerHTML = `<div class="lbl" style="margin-bottom:6px">Status das Contas</div>${pills}`;
@@ -971,6 +1164,16 @@ async function loadAndRender() {
 // Clock
 setInterval(tickClock, 1000);
 tickClock();
+
+// Inicializar inputs de período com data atual
+(function() {
+  const today = new Date().toISOString().slice(0, 10);
+  const mStart = today.slice(0, 8) + "01";
+  const fEl = document.getElementById("date-from");
+  const tEl = document.getElementById("date-to");
+  if (fEl) fEl.value = mStart;
+  if (tEl) tEl.value = today;
+})();
 
 // Election countdown
 set("dias-el", Math.max(0, Math.ceil((ELECTION - new Date()) / 86400000)));

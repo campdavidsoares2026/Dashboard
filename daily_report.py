@@ -130,6 +130,12 @@ class MetaAdsDataSync:
             for a in c.get("actions", [])
             if a.get("action_type") == "lead"
         )
+        thruplay = sum(
+            int(a.get("value", 0))
+            for c in campaigns
+            for a in c.get("actions", [])
+            if a.get("action_type") == "video_thruplay_watched"
+        )
         freqs = [float(c["frequency"]) for c in campaigns if c.get("frequency")]
         freq_avg = round(sum(freqs) / len(freqs), 2) if freqs else 0
 
@@ -143,6 +149,7 @@ class MetaAdsDataSync:
             "alcance": reach,
             "cliques": clicks,
             "leads": leads,
+            "thruplay": thruplay,
             "frequencia": freq_avg,
             "ctr": ctr,
             "cpc": cpc,
@@ -219,6 +226,8 @@ class MetaAdsDataSync:
             "impressoes": m["impressoes"],
             "alcance": m["alcance"],
             "cliques": m["cliques"],
+            "thruplay": m.get("thruplay", 0),
+            "frequencia": m.get("frequencia", 0),
             "ctr": m["ctr"],
             "cpc": m["cpc"],
             "budget_diario": None,
