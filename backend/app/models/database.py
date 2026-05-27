@@ -61,31 +61,35 @@ def init_db():
 
 def _run_migrations():
     """Run any necessary schema migrations for existing tables."""
-    migrations = []
+    if "postgresql" not in DATABASE_URL:
+        return  # SQLite managed entirely by create_all
 
-    if "postgresql" in DATABASE_URL:
-        # Add missing columns that may not exist in older schema versions
-        migrations = [
-            # recomendacoes: data_criacao column
-            "ALTER TABLE recomendacoes ADD COLUMN IF NOT EXISTS data_criacao DATE",
-            "ALTER TABLE recomendacoes ADD COLUMN IF NOT EXISTS data_execucao DATE",
-            "ALTER TABLE recomendacoes ADD COLUMN IF NOT EXISTS resultado JSONB",
-        ]
-    elif "sqlite" in DATABASE_URL:
-        # SQLite doesn't support IF NOT EXISTS for columns; skip silently
-        pass
-
-    if migrations:
-        try:
-            with engine.connect() as conn:
-                for stmt in migrations:
-                    try:
-                        conn.execute(__import__('sqlalchemy').text(stmt))
-                    except Exception:
-                        pass  # Column may already exist or table may not exist yet
-                conn.commit()
-        except Exception as e:
-            print(f"Warning: Migration step failed (non-fatal): {e}")
+    try:
+        from sqlalchemy import text as sa_text
+        with engine.connect() as conn:
+            # Check if recomendacoes table has the expected columns
+            # If it has an old/partial schema, drop and recreate it (it's always empty at this stage)
+            try:
+                result = conn.execute(sa_text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'recomendacoes' AND table_schema = 'public'"
+                ))
+                existing_cols = {row[0] for row in result}
+                expected_cols = {"id", "cluster_id", "data_criacao", "tipo", "descricao",
+                                 "status", "resultado", "data_execucao"}
+                if existing_cols and not expected_cols.issubset(existing_cols):
+                    # Table exists but is missing required columns — safe to recreate
+                    print(f"recomendacoes schema mismatch (found: {existing_cols}). Recreating table...")
+                    conn.execute(sa_text("DROP TABLE IF EXISTS recomendacoes CASCADE"))
+                    conn.commit()
+                    # create_all will recreate it on next startup call
+                    from app.models.models import Recomendacao
+                    Recomendacao.__table__.create(bind=engine, checkfirst=True)
+                    print("recomendacoes table recreated with correct schema.")
+            except Exception as e:
+                print(f"Warning: recomendacoes migration check failed (non-fatal): {e}")
+    except Exception as e:
+        print(f"Warning: Migration failed (non-fatal): {e}")
 
 def get_db():
     db = SessionLocal()

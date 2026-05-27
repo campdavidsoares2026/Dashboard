@@ -87,7 +87,10 @@ async def get_dashboard_data(db: Session = Depends(get_db)):
         ORDER BY data_criacao DESC
         LIMIT 20
         """
-        recs = [dict(row._mapping) for row in db.execute(text(recs_query)).fetchall()]
+        try:
+            recs = [dict(row._mapping) for row in db.execute(text(recs_query)).fetchall()]
+        except Exception:
+            recs = []  # Table may have stale schema; return empty until migration runs
 
         # ─── criativos_performance (from campaign_data per campaign) ────
         creatives_query = """
