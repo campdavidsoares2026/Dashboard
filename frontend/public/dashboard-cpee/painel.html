@@ -605,10 +605,18 @@ function compute({ contas, snapsMonth, snapsChart, criativos }) {
   const leads_mes   = (snapsMonth || []).reduce((a, b) => a + (b.leads  || 0), 0);
   const eq_mes      = (snapsMonth || []).reduce((a, b) => a + (b.eq     || 0), 0);
 
-  // CPEE consolidado (from metricas_conta aggregated)
-  const total_spend_c = active.reduce((a, b) => a + (b.spend  || 0), 0);
-  const total_leads_c = active.reduce((a, b) => a + (b.leads  || 0), 0);
-  const cpee = total_leads_c > 0 ? total_spend_c / total_leads_c : 0;
+  // CPEE consolidado = spend / EQ from this month's snapshots (consistent with main dashboard)
+  // metricas_conta only has today's delta — snapshots give full-month aggregate.
+  const cpee = eq_mes > 0 ? gasto_mes / eq_mes : 0;
+
+  // Per-account spend/eq from month's snapshots (for pills)
+  const byAcct = {};
+  (snapsMonth || []).forEach(s => {
+    if (!byAcct[s.account_id]) byAcct[s.account_id] = { spend: 0, eq: 0, leads: 0 };
+    byAcct[s.account_id].spend += s.spend  || 0;
+    byAcct[s.account_id].eq    += s.eq     || 0;
+    byAcct[s.account_id].leads += s.leads  || 0;
+  });
   const classif = cpee <= 0 ? "SEM DADOS" : cpee < 100 ? "BOM" : cpee < 200 ? "MÉDIO" : "RUIM";
   const cpeeColor = { "BOM": "var(--green)", "MÉDIO": "var(--yellow)", "RUIM": "var(--red)", "SEM DADOS": "var(--t2)" }[classif];
 
@@ -643,7 +651,7 @@ function compute({ contas, snapsMonth, snapsChart, criativos }) {
   const cpl_mes = leads_mes > 0 ? gasto_mes / leads_mes : 0;
 
   return {
-    active, gasto_hoje, gasto_mes, leads_mes, eq_mes,
+    active, byAcct, gasto_hoje, gasto_mes, leads_mes, eq_mes,
     cpee, classif, cpeeColor, meta, budget_d,
     dimMonth, dom, expPct, actPct, pacing,
     daysEl, chartDays, winner, cpl_mes,
@@ -685,9 +693,11 @@ function render(m) {
   const acEl = document.getElementById("accts-card");
   const pills = m.active.map(c => {
     const shortNome = (c.nome || c.account_id).split("·").pop()?.trim() || c.nome || c.account_id;
-    const cpeeStr = c.cpee > 0 ? BRLf(c.cpee) : "—";
+    const agg = m.byAcct[c.account_id] || {};
+    const acctCpee = agg.eq > 0 ? agg.spend / agg.eq : 0;
+    const cpeeStr  = acctCpee > 0 ? BRLf(acctCpee) : "—";
     const cl = (c.classificacao_cpee || "").toUpperCase();
-    const dot = cl === "BOM" || cl === "HOT" ? "ok" : cl === "SEM_DADOS" ? "err" : "ok";
+    const dot = cl === "SEM_DADOS" ? "err" : "ok";
     return `<div class="acct-pill">
       <div class="adot ${dot}"></div>
       <div class="aname">${shortNome}</div>
