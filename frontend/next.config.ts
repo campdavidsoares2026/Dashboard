@@ -4,16 +4,11 @@ const nextConfig: NextConfig = {
   // Friendly redirects to the static dashboard hosted under public/
   async redirects() {
     return [
-      {
-        source: "/dashboard/cpee",
-        destination: "/dashboard-cpee/index.html",
-        permanent: false,
-      },
-      {
-        source: "/cpee",
-        destination: "/dashboard-cpee/index.html",
-        permanent: false,
-      },
+      // Default: standalone (current) version
+      { source: "/dashboard/cpee", destination: "/dashboard-cpee/standalone.html", permanent: false },
+      { source: "/cpee", destination: "/dashboard-cpee/standalone.html", permanent: false },
+      // Legacy multi-file version still reachable
+      { source: "/dashboard/cpee/v1", destination: "/dashboard-cpee/index.html", permanent: false },
     ];
   },
 };
