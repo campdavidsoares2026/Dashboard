@@ -809,7 +809,12 @@ async function fetchData() {
   if (!cR.ok) throw new Error(`API ${cR.status}`);
 
   const snapsMonthData = await smR.json();
-  const snapsPeriodData = samePeriod ? snapsMonthData : await spR.json();
+  let snapsPeriodData = snapsMonthData;
+  if (!samePeriod && spR) {
+    const raw = await spR.json();
+    // Fallback para snapsMonthData se Supabase retornar erro (ex: cache de schema desatualizado)
+    snapsPeriodData = Array.isArray(raw) ? raw : snapsMonthData;
+  }
 
   return {
     contas:       await cR.json(),
@@ -887,11 +892,12 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
   const winner = (criativos || [])[0] || null;
   const cpl_mes = leads_mes > 0 ? gasto_mes / leads_mes : 0;
 
-  // Métricas do período selecionado
-  const impressoes_per = (snapsPeriod || snapsMonth || []).reduce((a,b) => a + (b.impressoes || 0), 0);
-  const alcance_per    = (snapsPeriod || snapsMonth || []).reduce((a,b) => a + (b.alcance    || 0), 0);
-  const cliques_per    = (snapsPeriod || snapsMonth || []).reduce((a,b) => a + (b.cliques    || 0), 0);
-  const thruplay_per   = (snapsPeriod || snapsMonth || []).reduce((a,b) => a + (b.thruplay   || 0), 0);
+  // Métricas do período selecionado (defensivo: garante que é array)
+  const _per = Array.isArray(snapsPeriod) ? snapsPeriod : (Array.isArray(snapsMonth) ? snapsMonth : []);
+  const impressoes_per = _per.reduce((a,b) => a + (b.impressoes || 0), 0);
+  const alcance_per    = _per.reduce((a,b) => a + (b.alcance    || 0), 0);
+  const cliques_per    = _per.reduce((a,b) => a + (b.cliques    || 0), 0);
+  const thruplay_per   = _per.reduce((a,b) => a + (b.thruplay   || 0), 0);
 
   return {
     active, byAcct, gasto_hoje, gasto_mes, leads_mes, eq_mes,
@@ -1165,7 +1171,7 @@ async function loadAndRender() {
 setInterval(tickClock, 1000);
 tickClock();
 
-// Inicializar inputs de período com data atual
+// Inicializar inputs de período com data atual e marcar botão ativo
 (function() {
   const today = new Date().toISOString().slice(0, 10);
   const mStart = today.slice(0, 8) + "01";
@@ -1173,6 +1179,7 @@ tickClock();
   const tEl = document.getElementById("date-to");
   if (fEl) fEl.value = mStart;
   if (tEl) tEl.value = today;
+  _setActivePreset("btn-month");
 })();
 
 // Election countdown
