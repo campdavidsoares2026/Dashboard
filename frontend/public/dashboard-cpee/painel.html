@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Painel Campanha · David Soares 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --green:  #6CB454;
+  --blue:   #3A589D;
+  --yellow: #FFD500;
+  --red:    #EF4444;
+  --bg:     #060D1A;
+  --card:   rgba(255,255,255,0.055);
+  --border: rgba(255,255,255,0.10);
+  --t1:     #F0F4FF;
+  --t2:     #8BA0C4;
+  --t3:     #4A5F7A;
+  --font:   'Space Grotesk', system-ui, sans-serif;
+  --mono:   'JetBrains Mono', monospace;
+  --r:      14px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--t1);
+  font-family: var(--font);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80vw 60vh at -5% 0%,   rgba(108,180,84,.20) 0%, transparent 60%),
+    radial-gradient(ellipse 60vw 50vh at 110% -5%, rgba(255,213,0,.10)  0%, transparent 60%),
+    radial-gradient(ellipse 90vw 70vh at 50% 110%, rgba(58,88,157,.24)  0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.painel {
+  position: relative;
+  z-index: 1;
+  height: 100vh;
+  width: 100vw;
+  display: grid;
+  grid-template-rows: 66px 1fr 118px 1fr 42px;
+  gap: 8px;
+  padding: 10px;
+}
+
+/* ─────── HEADER ─────── */
+.hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 0 22px;
+  backdrop-filter: blur(12px);
+}
+
+.hdr-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--green), var(--blue));
+  display: grid; place-items: center;
+  font-size: 14px; font-weight: 800; color: #fff;
+  flex-shrink: 0;
+}
+
+.cand-name  { font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+.cand-sub   { font-size: 11px; color: var(--t2); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; margin-top: 1px; }
+
+.hdr-center {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.phase {
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(108,180,84,.12);
+  border: 1px solid rgba(108,180,84,.35);
+  color: var(--green);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+}
+
+.countdown {
+  text-align: center;
+}
+.countdown-n {
+  font-size: 30px; font-weight: 800; font-family: var(--mono); color: var(--yellow);
+  letter-spacing: -.02em; line-height: 1;
+}
+.countdown-l { font-size: 9px; color: var(--t2); text-transform: uppercase; letter-spacing: .08em; margin-top: 1px; }
+
+.hdr-right { display: flex; align-items: center; gap: 18px; }
+
+.live-dot {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 700; color: var(--green);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.live-dot::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(108,180,84,.7); }
+  50%      { box-shadow: 0 0 0 7px rgba(108,180,84,0); }
+}
+
+.clock {
+  font-family: var(--mono); font-size: 24px; font-weight: 700; letter-spacing: .04em;
+}
+
+/* ─────── CARDS ─────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  backdrop-filter: blur(16px);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.lbl {
+  font-size: 10px; font-weight: 700; letter-spacing: .10em;
+  text-transform: uppercase; color: var(--t2);
+}
+
+.big-val {
+  font-size: clamp(32px, 3.8vw, 58px);
+  font-weight: 800; letter-spacing: -.03em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.sub { font-size: 12px; color: var(--t2); font-weight: 500; }
+
+/* ─────── ROW-1: BIG KPIs ─────── */
+.row1 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.7fr;
+  gap: 8px;
+}
+
+/* CPEE */
+.cpee-card {
+  border-top: 3px solid var(--cpee-c, var(--green));
+  background: linear-gradient(140deg,
+    color-mix(in oklch, var(--cpee-c, var(--green)) 16%, transparent) 0%,
+    rgba(255,255,255,.04) 55%);
+}
+.cpee-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  background: color-mix(in oklch, var(--cpee-c, var(--green)) 14%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cpee-c, var(--green)) 40%, transparent);
+  color: var(--cpee-c, var(--green));
+}
+.cpee-badge::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+}
+
+/* GASTO HOJE */
+.gasto-card {
+  border-top: 3px solid var(--green);
+  background: linear-gradient(140deg, rgba(108,180,84,.16) 0%, rgba(255,255,255,.04) 55%);
+}
+.daily-track {
+  height: 5px; background: rgba(255,255,255,.08);
+  border-radius: 999px; overflow: hidden; margin-top: 8px;
+}
+.daily-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--green), #8EDA6A);
+  transition: width 1.2s ease;
+}
+
+/* META MENSAL */
+.meta-card {
+  border-top: 3px solid var(--blue);
+  background: linear-gradient(140deg, rgba(58,88,157,.16) 0%, rgba(255,255,255,.04) 55%);
+}
+.meta-track {
+  height: 10px; background: rgba(255,255,255,.08);
+  border-radius: 999px; overflow: hidden;
+  position: relative; margin: 10px 0 6px;
+}
+.meta-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue), var(--green));
+  transition: width 1.5s ease;
+}
+.meta-expected {
+  position: absolute; top: 0; bottom: 0;
+  width: 2px; background: rgba(255,255,255,.4);
+}
+.meta-foot {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--t2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─────── ROW-2: SECONDARY ─────── */
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 1fr;
+  gap: 8px;
+}
+
+.sec-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+}
+
+.sec-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 12px;
+}
+.sec-block:first-child { padding-left: 0; }
+
+.sec-val {
+  font-size: clamp(22px, 2.6vw, 38px);
+  font-weight: 800; letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+
+.vdiv {
+  width: 1px; height: 55%;
+  background: var(--border); flex-shrink: 0;
+}
+
+/* Accounts */
+.accts-card { justify-content: center; gap: 8px; }
+
+.acct-pill {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 10px;
+}
+.adot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}
+.adot.ok    { background: var(--green); box-shadow: 0 0 7px var(--green); }
+.adot.err   { background: var(--red);   box-shadow: 0 0 7px var(--red); }
+.adot.warn  { background: var(--yellow); }
+.aname { font-size: 12px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acpee { font-family: var(--mono); font-size: 11px; color: var(--t2); font-weight: 600; }
+
+/* Gasto total */
+.total-card {
+  border-top: 3px solid var(--yellow);
+  background: linear-gradient(140deg, rgba(255,213,0,.12) 0%, rgba(255,255,255,.04) 55%);
+  align-items: center; justify-content: center; gap: 6px; text-align: center;
+}
+
+/* ─────── ROW-3: CHART + WINNER ─────── */
+.row3 {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 8px;
+}
+
+.chart-card { gap: 10px; }
+.chart-title { font-size: 10px; font-weight: 700; letter-spacing: .10em; text-transform: uppercase; color: var(--t2); }
+
+.bar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  padding-bottom: 28px;
+  position: relative;
+}
+
+.bcol {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end;
+  gap: 4px; height: 100%;
+}
+
+.brect {
+  width: 100%; border-radius: 5px 5px 2px 2px;
+  background: linear-gradient(180deg, var(--green), rgba(108,180,84,.45));
+  transition: height 1s ease; min-height: 3px;
+}
+.brect.today { background: linear-gradient(180deg, var(--yellow), rgba(255,213,0,.45)); }
+.brect.empty { background: rgba(255,255,255,.07); }
+
+.bval { font-size: 9px; font-family: var(--mono); color: var(--t2); white-space: nowrap; }
+.blbl { font-size: 9px; color: var(--t3); white-space: nowrap; text-align: center; }
+.blbl.today { color: var(--yellow); font-weight: 700; }
+
+/* ─────── WINNER ─────── */
+.winner-card {
+  border-top: 3px solid var(--yellow);
+  background: linear-gradient(140deg, rgba(255,213,0,.12) 0%, rgba(255,255,255,.04) 55%);
+  gap: 10px;
+}
+
+.winner-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 800; letter-spacing: .10em;
+  text-transform: uppercase; color: var(--yellow);
+}
+
+.winner-name {
+  font-size: clamp(16px, 1.7vw, 24px);
+  font-weight: 800; letter-spacing: -.01em;
+  line-height: 1.2; color: var(--t1);
+}
+.winner-acct { font-size: 11px; color: var(--t2); margin: 3px 0 10px; }
+
+.wmetrics { display: flex; gap: 16px; flex-wrap: wrap; }
+.wm { display: flex; flex-direction: column; gap: 1px; }
+.wm-l { font-size: 9px; font-weight: 700; letter-spacing: .10em; text-transform: uppercase; color: var(--t3); }
+.wm-v { font-size: 22px; font-weight: 800; font-family: var(--mono); letter-spacing: -.02em; }
+.wm-v.g { color: var(--green); }
+.wm-v.y { color: var(--yellow); }
+.wm-v.w { color: var(--t1); }
+
+.no-winner { font-size: 13px; color: var(--t3); }
+
+/* ─────── FOOTER ─────── */
+.footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px;
+  font-size: 11px; color: var(--t3); letter-spacing: .03em;
+}
+.footer a { color: var(--blue); text-decoration: none; }
+.footer-refresh { font-family: var(--mono); font-size: 11px; color: var(--t2); }
+
+/* ─────── LOADING ─────── */
+.overlay {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; z-index: 100;
+}
+.spinner {
+  width: 44px; height: 44px;
+  border: 3px solid rgba(108,180,84,.2);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.overlay-txt { font-size: 13px; color: var(--t2); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+
+/* ─────── ERROR BANNER ─────── */
+.err-banner {
+  position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%);
+  background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.4);
+  color: #FCA5A5; padding: 9px 20px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; letter-spacing: .03em;
+  display: none; z-index: 50;
+}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="spinner"></div>
+  <div class="overlay-txt">Carregando dados da campanha…</div>
+</div>
+
+<div class="err-banner" id="err-banner"></div>
+
+<div class="painel" id="painel" style="visibility:hidden">
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="hdr">
+    <div class="hdr-brand">
+      <div class="avatar">DS</div>
+      <div>
+        <div class="cand-name">Dep. Federal David Soares</div>
+        <div class="cand-sub">Podemos · Número 20 · São Paulo · SP</div>
+      </div>
+    </div>
+
+    <div class="hdr-center">
+      <div class="phase" id="phase-lbl">Pré-Campanha</div>
+      <div class="countdown">
+        <div class="countdown-n" id="dias-el">—</div>
+        <div class="countdown-l">Dias até eleição</div>
+      </div>
+    </div>
+
+    <div class="hdr-right">
+      <div class="live-dot">AO VIVO</div>
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ═══ ROW 1 — BIG KPIs ═══ -->
+  <div class="row1">
+
+    <!-- CPEE -->
+    <div class="card cpee-card" id="cpee-card">
+      <div class="lbl">CPEE Consolidado</div>
+      <div class="big-val" id="cpee-val">—</div>
+      <div class="cpee-badge" id="cpee-badge">SEM DADOS</div>
+    </div>
+
+    <!-- GASTO HOJE -->
+    <div class="card gasto-card">
+      <div class="lbl">Gasto Hoje</div>
+      <div class="big-val" style="color:var(--green)" id="gh-val">—</div>
+      <div>
+        <div class="sub" id="gh-sub">— do orçamento diário</div>
+        <div class="daily-track"><div class="daily-fill" id="gh-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- META MENSAL -->
+    <div class="card meta-card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="lbl">Meta Mensal</div>
+        <div class="sub" id="meta-dias-lbl">—</div>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <div class="big-val" id="meta-spent" style="font-size:clamp(26px,3vw,50px)">—</div>
+        <div class="sub" id="meta-total-lbl" style="font-size:15px">/ —</div>
+      </div>
+      <div>
+        <div class="meta-track">
+          <div class="meta-fill" id="meta-bar" style="width:0%"></div>
+          <div class="meta-expected" id="meta-exp-marker" style="left:0%"></div>
+        </div>
+        <div class="meta-foot">
+          <span id="meta-pct">0%</span>
+          <span id="meta-pacing">—</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ ROW 2 — SECONDARY ═══ -->
+  <div class="row2">
+
+    <!-- Leads + EQ -->
+    <div class="card sec-card">
+      <div class="sec-block" style="padding-left:4px">
+        <div class="lbl">Leads do Mês</div>
+        <div class="sec-val" style="color:var(--green)" id="leads-val">—</div>
+        <div class="sub" id="cpl-val">CPL —</div>
+      </div>
+      <div class="vdiv"></div>
+      <div class="sec-block">
+        <div class="lbl">EQ · PVDs</div>
+        <div class="sec-val" style="color:var(--blue)" id="eq-val">—</div>
+        <div class="sub">Engajamentos qualificados</div>
+      </div>
+    </div>
+
+    <!-- Accounts status -->
+    <div class="card accts-card" id="accts-card">
+      <div class="lbl" style="margin-bottom:2px">Status das Contas</div>
+    </div>
+
+    <!-- Total spend -->
+    <div class="card total-card">
+      <div class="lbl">Total Gasto · Mês</div>
+      <div class="big-val" style="color:var(--yellow);text-align:center" id="total-val">—</div>
+      <div class="sub" style="text-align:center" id="total-sub">— contas monitoradas</div>
+    </div>
+
+  </div>
+
+  <!-- ═══ ROW 3 — CHART + WINNER ═══ -->
+  <div class="row3">
+
+    <!-- Bar chart -->
+    <div class="card chart-card">
+      <div class="chart-title">⬛ Gasto Diário · Últimos 10 Dias <span style="color:var(--yellow);margin-left:8px">■ Hoje</span></div>
+      <div class="bar-wrap" id="bar-wrap">
+        <div class="overlay-txt" style="font-size:11px;color:var(--t3)">Carregando…</div>
+      </div>
+    </div>
+
+    <!-- Winner creative -->
+    <div class="card winner-card">
+      <div class="winner-badge">🏆 Criativo Campeão</div>
+      <div id="winner-body">
+        <div class="no-winner">Carregando…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="footer">
+    <span>CPEE Painel · v1.0 · <a href="/dashboard-cpee/standalone.html">→ Painel analítico completo</a></span>
+    <span id="last-sync">—</span>
+    <span class="footer-refresh">Atualização em <span id="cntdwn">5:00</span></span>
+  </footer>
+
+</div><!-- /painel -->
+
+<script>
+/* ═══════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════ */
+const SUPA_URL  = "https://ygbrgtuddtisoowwdxqn.supabase.co";
+const SUPA_KEY  = "sb_publishable_dD7pAtkSiOk-p83TEUdC0A_9RSr0mto";
+const ELECTION  = new Date("2026-10-04T00:00:00-03:00");
+
+// Meta mensal padrão (R$) — configurável via ?meta=VALOR na URL ou localStorage
+const savedMeta = parseFloat(new URLSearchParams(location.search).get("meta") || localStorage.getItem("painel_meta") || "0");
+const META_DEFAULT = savedMeta > 0 ? savedMeta : 20000;
+
+/* ═══════════════════════════════════════════
+   FORMATADORES
+═══════════════════════════════════════════ */
+const BRL  = n => (n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const BRLf = n => (n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const NUM  = n => Math.round(n ?? 0).toLocaleString("pt-BR");
+const compact = n => {
+  if (n >= 1e6) return (n / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "M";
+  if (n >= 1e3) return (n / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) + "k";
+  return NUM(n);
+};
+
+/* ═══════════════════════════════════════════
+   SUPABASE FETCH
+═══════════════════════════════════════════ */
+const HDR = {
+  apikey: SUPA_KEY,
+  Authorization: `Bearer ${SUPA_KEY}`,
+  "Content-Type": "application/json",
+  Accept: "application/json",
+};
+
+async function fetchData() {
+  const today      = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 8) + "01";
+  const chartStart = new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10);
+
+  const [cR, smR, scR, crR] = await Promise.all([
+    fetch(`${SUPA_URL}/rest/v1/metricas_conta?select=*&order=executado_em.desc`, { headers: HDR }),
+    fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=*&data=gte.${monthStart}&order=data.asc`, { headers: HDR }),
+    fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=data,spend,leads,eq,account_id&data=gte.${chartStart}&order=data.asc`, { headers: HDR }),
+    fetch(`${SUPA_URL}/rest/v1/criativos_performance?select=*&order=cpee.asc&limit=1`, { headers: HDR }),
+  ]);
+
+  if (!cR.ok) throw new Error(`API ${cR.status}`);
+
+  return {
+    contas:      await cR.json(),
+    snapsMonth:  await smR.json(),
+    snapsChart:  await scR.json(),
+    criativos:   await crR.json(),
+  };
+}
+
+/* ═══════════════════════════════════════════
+   COMPUTE
+═══════════════════════════════════════════ */
+function compute({ contas, snapsMonth, snapsChart, criativos }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const now   = new Date();
+
+  // Dedupe contas → latest per account_id
+  const latestMap = {};
+  (contas || []).forEach(c => {
+    if (!latestMap[c.account_id] || c.executado_em > latestMap[c.account_id].executado_em)
+      latestMap[c.account_id] = c;
+  });
+  const active = Object.values(latestMap);
+
+  // Today / month from snapshots
+  const todaySnaps  = (snapsMonth || []).filter(s => s.data === today);
+  const gasto_hoje  = todaySnaps.reduce((a, b) => a + (b.spend  || 0), 0);
+  const gasto_mes   = (snapsMonth || []).reduce((a, b) => a + (b.spend  || 0), 0);
+  const leads_mes   = (snapsMonth || []).reduce((a, b) => a + (b.leads  || 0), 0);
+  const eq_mes      = (snapsMonth || []).reduce((a, b) => a + (b.eq     || 0), 0);
+
+  // CPEE consolidado (from metricas_conta aggregated)
+  const total_spend_c = active.reduce((a, b) => a + (b.spend  || 0), 0);
+  const total_leads_c = active.reduce((a, b) => a + (b.leads  || 0), 0);
+  const cpee = total_leads_c > 0 ? total_spend_c / total_leads_c : 0;
+  const classif = cpee <= 0 ? "SEM DADOS" : cpee < 100 ? "BOM" : cpee < 200 ? "MÉDIO" : "RUIM";
+  const cpeeColor = { "BOM": "var(--green)", "MÉDIO": "var(--yellow)", "RUIM": "var(--red)", "SEM DADOS": "var(--t2)" }[classif];
+
+  // Meta mensal
+  const meta_sum = active.reduce((a, b) => a + (b.meta_mensal || 0), 0);
+  const meta     = meta_sum > 0 ? meta_sum : META_DEFAULT;
+  const budget_d = active.reduce((a, b) => a + (b.budget_diario || 0), 0) || (meta / 30);
+
+  // Calendar
+  const dimMonth  = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dom       = now.getDate();
+  const expPct    = dom / dimMonth;
+  const actPct    = meta > 0 ? gasto_mes / meta : 0;
+  const pad       = actPct - expPct;
+  const pacing    = Math.abs(pad) < 0.05 ? "No ritmo" : pad > 0
+    ? `+${(pad * 100).toFixed(1)} p.p. acima do esperado`
+    : `${(pad * 100).toFixed(1)} p.p. abaixo do esperado`;
+
+  // Days to election
+  const daysEl = Math.max(0, Math.ceil((ELECTION - now) / 86400000));
+
+  // Daily bar chart (last 10 days)
+  const byDay = {};
+  (snapsChart || []).forEach(s => { byDay[s.data] = (byDay[s.data] || 0) + (s.spend || 0); });
+  const chartDays = [];
+  for (let i = 9; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    chartDays.push({ date: d, spend: byDay[d] || 0, today: d === today });
+  }
+
+  const winner = (criativos || [])[0] || null;
+  const cpl_mes = leads_mes > 0 ? gasto_mes / leads_mes : 0;
+
+  return {
+    active, gasto_hoje, gasto_mes, leads_mes, eq_mes,
+    cpee, classif, cpeeColor, meta, budget_d,
+    dimMonth, dom, expPct, actPct, pacing,
+    daysEl, chartDays, winner, cpl_mes,
+  };
+}
+
+/* ═══════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════ */
+function render(m) {
+  // ── CPEE ──
+  set("cpee-val", m.cpee > 0 ? BRLf(m.cpee) : "—");
+  set("cpee-badge", m.classif);
+  const cc = document.getElementById("cpee-card");
+  cc.style.setProperty("--cpee-c", m.cpeeColor);
+
+  // ── GASTO HOJE ──
+  set("gh-val", BRL(m.gasto_hoje));
+  const dp = m.budget_d > 0 ? Math.min(m.gasto_hoje / m.budget_d * 100, 100) : 0;
+  set("gh-sub", `${dp.toFixed(0)}% do orçamento diário · Alvo ${BRL(m.budget_d)}/dia`);
+  css("gh-bar", "width", `${dp}%`);
+
+  // ── META MENSAL ──
+  set("meta-spent", BRL(m.gasto_mes));
+  set("meta-total-lbl", `/ ${BRL(m.meta)}`);
+  set("meta-dias-lbl", `Dia ${m.dom} de ${m.dimMonth}`);
+  const pct = m.actPct * 100;
+  css("meta-bar",       "width", `${Math.min(pct, 100)}%`);
+  css("meta-exp-marker","left",  `${Math.min(m.expPct * 100, 100)}%`);
+  set("meta-pct", `${pct.toFixed(1)}%`);
+  set("meta-pacing", m.pacing);
+
+  // ── LEADS + EQ ──
+  set("leads-val", NUM(m.leads_mes));
+  set("cpl-val", m.cpl_mes > 0 ? `CPL ${BRLf(m.cpl_mes)}` : "CPL —");
+  set("eq-val", compact(m.eq_mes));
+
+  // ── ACCOUNTS ──
+  const acEl = document.getElementById("accts-card");
+  const pills = m.active.map(c => {
+    const shortNome = (c.nome || c.account_id).split("·").pop()?.trim() || c.nome || c.account_id;
+    const cpeeStr = c.cpee > 0 ? BRLf(c.cpee) : "—";
+    const cl = (c.classificacao_cpee || "").toUpperCase();
+    const dot = cl === "BOM" || cl === "HOT" ? "ok" : cl === "SEM_DADOS" ? "err" : "ok";
+    return `<div class="acct-pill">
+      <div class="adot ${dot}"></div>
+      <div class="aname">${shortNome}</div>
+      <div class="acpee">CPEE ${cpeeStr}</div>
+    </div>`;
+  }).join("");
+  acEl.innerHTML = `<div class="lbl" style="margin-bottom:6px">Status das Contas</div>${pills}`;
+
+  // ── TOTAL ──
+  set("total-val", BRL(m.gasto_mes));
+  set("total-sub", `${m.active.length} conta${m.active.length !== 1 ? "s" : ""} ativa${m.active.length !== 1 ? "s" : ""}`);
+
+  // ── BAR CHART ──
+  renderBars(m.chartDays);
+
+  // ── WINNER ──
+  renderWinner(m.winner);
+
+  // ── HEADER ──
+  set("dias-el", m.daysEl);
+
+  // ── LAST SYNC ──
+  set("last-sync", `Sincronizado: ${new Date().toLocaleTimeString("pt-BR")}`);
+}
+
+function renderBars(days) {
+  const wrap = document.getElementById("bar-wrap");
+  const maxV = Math.max(...days.map(d => d.spend), 1);
+
+  wrap.innerHTML = days.map(d => {
+    const hPct = d.spend > 0 ? Math.max((d.spend / maxV) * 100, 5) : 5;
+    const lbl  = new Date(d.date + "T12:00:00Z").toLocaleDateString("pt-BR", {
+      weekday: "short", day: "2-digit", timeZone: "UTC"
+    });
+    const val = d.spend > 0 ? compact(d.spend) : "—";
+    const cl  = d.today ? "today" : d.spend === 0 ? "empty" : "";
+    return `<div class="bcol">
+      <div class="bval">${val}</div>
+      <div class="brect ${cl}" style="height:${hPct}%"></div>
+      <div class="blbl ${d.today ? "today" : ""}">${lbl}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderWinner(w) {
+  const el = document.getElementById("winner-body");
+  if (!w) {
+    el.innerHTML = `<div class="no-winner">Nenhum criativo com dados suficientes no período</div>`;
+    return;
+  }
+  const name    = w.nome || w.criativo_id || "—";
+  const acct    = w.nome_conta || "";
+  const tipo    = (w.tipo_criativo || "AD").toUpperCase();
+  const cpeeStr = w.cpee   > 0 ? BRLf(w.cpee)              : "—";
+  const ctrStr  = w.ctr    > 0 ? w.ctr.toFixed(2) + "%"    : "—";
+  const gastStr = w.spend  > 0 ? BRL(w.spend)               : "—";
+  const eqStr   = w.eq     > 0 ? compact(w.eq)              : "—";
+
+  el.innerHTML = `
+    <span style="font-size:9px;padding:2px 9px;border-radius:999px;
+      background:rgba(255,213,0,.12);border:1px solid rgba(255,213,0,.3);
+      color:var(--yellow);font-weight:700;letter-spacing:.08em">${tipo}</span>
+    <div class="winner-name" style="margin-top:8px">${name}</div>
+    <div class="winner-acct">${acct}</div>
+    <div class="wmetrics">
+      <div class="wm"><div class="wm-l">CPEE</div><div class="wm-v g">${cpeeStr}</div></div>
+      <div class="wm"><div class="wm-l">CTR</div><div class="wm-v y">${ctrStr}</div></div>
+      <div class="wm"><div class="wm-l">Gasto</div><div class="wm-v w">${gastStr}</div></div>
+      <div class="wm"><div class="wm-l">EQ</div><div class="wm-v w">${eqStr}</div></div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   DOM UTILS
+═══════════════════════════════════════════ */
+const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+const css = (id, p, v) => { const e = document.getElementById(id); if (e) e.style[p] = v; };
+
+/* ═══════════════════════════════════════════
+   CLOCK + COUNTDOWN
+═══════════════════════════════════════════ */
+function tickClock() {
+  set("clock", new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+}
+
+let countdown = 300;
+let refreshTimer = null;
+
+function startCountdown() {
+  countdown = 300;
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    countdown--;
+    const m = Math.floor(countdown / 60);
+    const s = countdown % 60;
+    set("cntdwn", `${m}:${s.toString().padStart(2, "0")}`);
+    if (countdown <= 0) {
+      loadAndRender();
+    }
+  }, 1000);
+}
+
+function showErr(msg) {
+  const el = document.getElementById("err-banner");
+  el.textContent = `⚠ ${msg}`;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 8000);
+}
+
+/* ═══════════════════════════════════════════
+   MAIN LOAD
+═══════════════════════════════════════════ */
+async function loadAndRender() {
+  try {
+    const raw = await fetchData();
+    const m   = compute(raw);
+    render(m);
+    document.getElementById("overlay").style.display = "none";
+    document.getElementById("painel").style.visibility = "visible";
+  } catch (e) {
+    console.error("Painel error:", e);
+    showErr(`Erro ao carregar: ${e.message}`);
+    document.getElementById("overlay").style.display = "none";
+    document.getElementById("painel").style.visibility = "visible";
+  }
+  startCountdown();
+}
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+// Clock
+setInterval(tickClock, 1000);
+tickClock();
+
+// Election countdown
+set("dias-el", Math.max(0, Math.ceil((ELECTION - new Date()) / 86400000)));
+
+// Load data
+loadAndRender();
+</script>
+</body>
+</html>
