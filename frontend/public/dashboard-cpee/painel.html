@@ -416,6 +416,19 @@ body::before {
 }
 .winner-acct { font-size: 11px; color: var(--t2); margin: 3px 0 10px; }
 
+.winner-row {
+  display: flex; gap: 12px; align-items: stretch;
+}
+.winner-thumb {
+  width: 90px; height: 90px; border-radius: 10px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  object-fit: cover; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+}
+.winner-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
 .wmetrics { display: flex; gap: 16px; flex-wrap: wrap; }
 .wm { display: flex; flex-direction: column; gap: 1px; }
 .wm-l { font-size: 9px; font-weight: 700; letter-spacing: .10em; text-transform: uppercase; color: var(--t3); }
@@ -799,7 +812,7 @@ async function fetchData() {
     fetch(`${SUPA_URL}/rest/v1/metricas_conta?select=*&order=executado_em.desc`, { headers: HDR }),
     fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=*&data=gte.${monthStart}&order=data.asc`, { headers: HDR }),
     fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=data,spend,leads,eq,account_id&data=gte.${chartStart}&order=data.asc`, { headers: HDR }),
-    fetch(`${SUPA_URL}/rest/v1/criativos_performance?select=*&order=cpee.asc&limit=1`, { headers: HDR }),
+    fetch(`${SUPA_URL}/rest/v1/criativos_performance?select=*&spend=gte.50&cpee=gt.0&order=cpee.asc&limit=1`, { headers: HDR }),
     samePeriod ? null :
       fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=impressoes,alcance,cliques,thruplay,data,account_id&data=gte.${periodStart}&data=lte.${periodEnd}&order=data.asc`, { headers: HDR }),
   ];
@@ -1009,25 +1022,38 @@ function renderWinner(w) {
     el.innerHTML = `<div class="no-winner">Nenhum criativo com dados suficientes no período</div>`;
     return;
   }
-  const name    = w.nome || w.criativo_id || "—";
-  const acct    = w.nome_conta || "";
-  const tipo    = (w.tipo_criativo || "AD").toUpperCase();
+  // Column names in criativos_performance: ad_id, ad_nome, conta_nome, pauta, thumbnail_url
+  const name    = w.ad_nome || w.nome || w.ad_id || "—";
+  const acct    = w.conta_nome || w.nome_conta || "";
+  const pauta   = (w.pauta || w.tipo_criativo || "AD").toUpperCase();
+  const thumb   = w.thumbnail_url || "";
   const cpeeStr = w.cpee   > 0 ? BRLf(w.cpee)              : "—";
   const ctrStr  = w.ctr    > 0 ? w.ctr.toFixed(2) + "%"    : "—";
   const gastStr = w.spend  > 0 ? BRL(w.spend)               : "—";
   const eqStr   = w.eq     > 0 ? compact(w.eq)              : "—";
 
+  // Fallback emoji when thumbnail is missing (image ad / video / carousel)
+  const fallbackEmoji = pauta === "VID" ? "🎬" : pauta === "CAR" ? "🎠" : "🖼️";
+  const thumbHTML = thumb
+    ? `<img class="winner-thumb" src="${thumb}" alt="${name}" referrerpolicy="no-referrer" onerror="this.outerHTML='<div class=\\'winner-thumb\\'>${fallbackEmoji}</div>'">`
+    : `<div class="winner-thumb">${fallbackEmoji}</div>`;
+
   el.innerHTML = `
     <span style="font-size:9px;padding:2px 9px;border-radius:999px;
       background:rgba(255,213,0,.12);border:1px solid rgba(255,213,0,.3);
-      color:var(--yellow);font-weight:700;letter-spacing:.08em">${tipo}</span>
-    <div class="winner-name" style="margin-top:8px">${name}</div>
-    <div class="winner-acct">${acct}</div>
-    <div class="wmetrics">
-      <div class="wm"><div class="wm-l">CPEE</div><div class="wm-v g">${cpeeStr}</div></div>
-      <div class="wm"><div class="wm-l">CTR</div><div class="wm-v y">${ctrStr}</div></div>
-      <div class="wm"><div class="wm-l">Gasto</div><div class="wm-v w">${gastStr}</div></div>
-      <div class="wm"><div class="wm-l">EQ</div><div class="wm-v w">${eqStr}</div></div>
+      color:var(--yellow);font-weight:700;letter-spacing:.08em">${pauta}</span>
+    <div class="winner-row" style="margin-top:8px">
+      ${thumbHTML}
+      <div class="winner-info">
+        <div class="winner-name">${name}</div>
+        <div class="winner-acct">${acct}</div>
+        <div class="wmetrics">
+          <div class="wm"><div class="wm-l">CPEE</div><div class="wm-v g">${cpeeStr}</div></div>
+          <div class="wm"><div class="wm-l">CTR</div><div class="wm-v y">${ctrStr}</div></div>
+          <div class="wm"><div class="wm-l">Gasto</div><div class="wm-v w">${gastStr}</div></div>
+          <div class="wm"><div class="wm-l">EQ</div><div class="wm-v w">${eqStr}</div></div>
+        </div>
+      </div>
     </div>`;
 }
 
