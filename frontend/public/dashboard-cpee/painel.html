@@ -553,6 +553,7 @@ body::before {
     <div class="period-sep-v"></div>
     <button class="preset-btn active" id="btn-month" onclick="setPeriod('month')">Mês</button>
     <button class="preset-btn" id="btn-30d" onclick="setPeriod('30d')">30d</button>
+    <button class="preset-btn" id="btn-14d" onclick="setPeriod('14d')">14d</button>
     <button class="preset-btn" id="btn-7d" onclick="setPeriod('7d')">7d</button>
     <button class="preset-btn" id="btn-today" onclick="setPeriod('today')">Hoje</button>
     <button class="apply-btn" onclick="applyCustomPeriod()">Aplicar</button>
@@ -749,30 +750,52 @@ const HDR = {
 /* ═══════════════════════════════════════════
    PERÍODO SELECIONADO
 ═══════════════════════════════════════════ */
-const _today0 = new Date().toISOString().slice(0, 10);
+// localDateStr(date): YYYY-MM-DD on user's local timezone (NOT UTC).
+// Critical: toISOString() returns UTC — after 21h BR (UTC-3) it bumps to
+// the next day, so querying snapshots_diarios with that date returns 0 rows
+// because the cron last wrote yesterday's local date. Always compute local.
+function localDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function localDateMinusDays(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return localDateStr(d);
+}
+
+const _today0 = localDateStr();
 let periodStart = _today0.slice(0, 8) + "01"; // início do mês atual
 let periodEnd   = _today0;
 
+const PRESET_IDS = ["btn-month","btn-30d","btn-14d","btn-7d","btn-today"];
+
 function _setActivePreset(id) {
-  ["btn-month","btn-30d","btn-7d","btn-today"].forEach(b => {
+  PRESET_IDS.forEach(b => {
     const el = document.getElementById(b);
     if (el) el.classList.toggle("active", b === id);
   });
 }
 
 function setPeriod(preset) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   switch (preset) {
     case "month":
       periodStart = today.slice(0, 8) + "01";
       periodEnd   = today;
       break;
     case "30d":
-      periodStart = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+      periodStart = localDateMinusDays(29);
+      periodEnd   = today;
+      break;
+    case "14d":
+      periodStart = localDateMinusDays(13);
       periodEnd   = today;
       break;
     case "7d":
-      periodStart = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+      periodStart = localDateMinusDays(6);
       periodEnd   = today;
       break;
     case "today":
@@ -784,7 +807,7 @@ function setPeriod(preset) {
   const tEl = document.getElementById("date-to");
   if (fEl) fEl.value = periodStart;
   if (tEl) tEl.value = periodEnd;
-  _setActivePreset("btn-" + (preset === "month" ? "month" : preset));
+  _setActivePreset("btn-" + preset);
   loadAndRender();
 }
 
@@ -800,9 +823,9 @@ function applyCustomPeriod() {
 }
 
 async function fetchData() {
-  const today      = new Date().toISOString().slice(0, 10);
+  const today      = localDateStr();
   const monthStart = today.slice(0, 8) + "01";
-  const chartStart = new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10);
+  const chartStart = localDateMinusDays(9);
 
   // snapsPeriod = período selecionado (para métricas impressões/alcance/thruplay/cliques)
   // snapsMonth  = sempre mês atual (para CPEE, Meta Mensal, Gasto)
@@ -842,7 +865,7 @@ async function fetchData() {
    COMPUTE
 ═══════════════════════════════════════════ */
 function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const now   = new Date();
 
   // Dedupe contas → latest per account_id
@@ -898,7 +921,7 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
   (snapsChart || []).forEach(s => { byDay[s.data] = (byDay[s.data] || 0) + (s.spend || 0); });
   const chartDays = [];
   for (let i = 9; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const d = localDateMinusDays(i);
     chartDays.push({ date: d, spend: byDay[d] || 0, today: d === today });
   }
 
@@ -975,7 +998,7 @@ function render(m) {
   set("thruplay-val",   compact(m.thruplay_per));
   set("cliques-val",    compact(m.cliques_per));
   // Tag de período (compartilhada por Impressões, Gasto, Total Gasto)
-  const _todayStr = new Date().toISOString().slice(0,10);
+  const _todayStr = localDateStr();
   const isMonth = periodStart === _todayStr.slice(0,8) + "01" && periodEnd === _todayStr;
   const isToday = periodStart === _todayStr && periodEnd === _todayStr;
   const periodLabel = isMonth ? "· Mês" : isToday ? "· Hoje" : `· ${periodStart} → ${periodEnd}`;
@@ -1221,7 +1244,7 @@ tickClock();
 
 // Inicializar inputs de período com data atual e marcar botão ativo
 (function() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const mStart = today.slice(0, 8) + "01";
   const fEl = document.getElementById("date-from");
   const tEl = document.getElementById("date-to");
