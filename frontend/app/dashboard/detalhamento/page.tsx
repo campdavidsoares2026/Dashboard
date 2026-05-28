@@ -63,6 +63,24 @@ export default function DetalhamentoPage() {
     criativosQ.error ||
     metricasQ.error;
 
+  const isLoading =
+    accountsQ.isLoading ||
+    clustersQ.isLoading ||
+    criativosQ.isLoading ||
+    metricasQ.isLoading;
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="h-10 w-64 bg-podemos-secondary rounded animate-pulse mb-6" />
+        <div className="h-16 bg-podemos-secondary rounded animate-pulse mb-6" />
+        <div className="h-12 bg-podemos-secondary rounded animate-pulse mb-6" />
+        <div className="h-48 bg-podemos-secondary rounded animate-pulse mb-6" />
+        <div className="h-64 bg-podemos-secondary rounded animate-pulse" />
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="p-6">
