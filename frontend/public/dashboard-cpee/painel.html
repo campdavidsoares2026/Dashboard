@@ -184,7 +184,7 @@ body::before {
 }
 .countdown-l { font-size: 9px; color: var(--t2); text-transform: uppercase; letter-spacing: .08em; margin-top: 1px; }
 
-.hdr-right { display: flex; align-items: center; gap: 18px; }
+.hdr-right { display: flex; align-items: center; gap: 14px; }
 
 .live-dot {
   display: flex; align-items: center; gap: 7px;
@@ -199,6 +199,41 @@ body::before {
 @keyframes pulse {
   0%,100% { box-shadow: 0 0 0 0 rgba(108,180,84,.7); }
   50%      { box-shadow: 0 0 0 7px rgba(108,180,84,0); }
+}
+
+/* ─────── HEADER SERVICE PILLS (DB / VERCEL / VPS / LPs) ─────── */
+.hdr-svcs { display: flex; align-items: center; gap: 10px; }
+.svc-pill {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 700; color: var(--t2);
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  transition: all 0.3s;
+}
+.svc-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--t3);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.svc-dot.ok   { background: var(--green); box-shadow: 0 0 5px rgba(108,180,84,.6); }
+.svc-dot.slow { background: var(--yellow); box-shadow: 0 0 5px rgba(255,213,0,.6); }
+.svc-dot.err  {
+  background: var(--red);
+  animation: blink-err 0.9s ease-in-out infinite;
+}
+.svc-pill.err {
+  border-color: rgba(239,68,68,.4);
+  background: rgba(239,68,68,.08);
+  color: var(--red);
+}
+
+@keyframes blink-err {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.85), 0 0 8px rgba(239,68,68,.9); opacity: 1; }
+  50%      { box-shadow: 0 0 0 6px rgba(239,68,68,0),   0 0 0 rgba(239,68,68,0); opacity: .5; }
 }
 
 .clock {
@@ -539,6 +574,26 @@ body::before {
     </div>
 
     <div class="hdr-right">
+      <div class="hdr-svcs">
+        <span class="svc-pill" id="pill-db" title="Supabase">
+          <span class="svc-dot" id="dot-db"></span>
+          <span>Banco</span>
+        </span>
+        <span class="svc-pill" id="pill-vercel" title="paineltv-david.vercel.app">
+          <span class="svc-dot" id="dot-vercel"></span>
+          <span>Vercel</span>
+        </span>
+        <span class="svc-pill" id="pill-vps" title="VPS Hostinger">
+          <span class="svc-dot" id="dot-vps"></span>
+          <span>VPS</span>
+        </span>
+        <!-- LP pill: descomentar quando URLs estiverem disponíveis
+        <span class="svc-pill" id="pill-lp" title="Landing Pages">
+          <span class="svc-dot" id="dot-lp"></span>
+          <span>LPs</span>
+        </span>
+        -->
+      </div>
       <div class="live-dot">AO VIVO</div>
       <div class="clock" id="clock">--:--:--</div>
     </div>
@@ -680,26 +735,22 @@ body::before {
   <!-- ═══ FOOTER ═══ -->
   <footer class="footer">
 
-    <!-- Saúde da Infraestrutura -->
+    <!-- Saúde da Infraestrutura (latência em ms; status visual está no header) -->
     <div class="infra-bar">
       <span class="infra-item">
-        <span class="infra-dot" id="dot-db"></span>
-        <span>Banco de Dados</span>
-        <span class="infra-ms" id="ms-db"></span>
+        <span>Banco</span>
+        <span class="infra-ms" id="ms-db">—</span>
       </span>
       <span class="infra-sep">|</span>
       <span class="infra-item">
-        <span class="infra-dot" id="dot-dash"></span>
-        <span>Dashboard</span>
-        <span class="infra-ms" id="ms-dash"></span>
+        <span>Vercel</span>
+        <span class="infra-ms" id="ms-vercel">—</span>
       </span>
       <span class="infra-sep">|</span>
       <span class="infra-item">
-        <span class="infra-dot" id="dot-bk"></span>
-        <span>Backend</span>
-        <span class="infra-ms" id="ms-bk"></span>
+        <span>VPS</span>
+        <span class="infra-ms" id="ms-vps">—</span>
       </span>
-      <!-- LPs adicionadas aqui quando disponíveis -->
     </div>
 
     <!-- Info footer -->
@@ -1142,6 +1193,10 @@ function showErr(msg) {
 /* ═══════════════════════════════════════════
    INFRAESTRUTURA — HEALTH CHECK
 ═══════════════════════════════════════════ */
+// VPS URL: trocar pelo endereço real quando configurado. Deixar string vazia
+// mantém o pill em estado "não configurado" (cinza, sem blink).
+const VPS_URL = ""; // ex: "https://api.davidsoares.com.br/health"
+
 const INFRA = [
   {
     id: "db",
@@ -1155,11 +1210,11 @@ const INFRA = [
     },
   },
   {
-    id: "dash",
+    id: "vercel",
     check: async () => {
       const t = Date.now();
-      // no-cors: opaque response (status 0) — qualquer conexão bem-sucedida = online
-      await fetch("https://dashboard-prod-six.vercel.app/dashboard-cpee/standalone.html", {
+      // Self-check: bate no próprio painel.html
+      await fetch("https://paineltv-david.vercel.app/dashboard-cpee/painel.html", {
         mode: "no-cors",
         signal: AbortSignal.timeout(6000),
       });
@@ -1167,20 +1222,25 @@ const INFRA = [
     },
   },
   {
-    id: "bk",
+    id: "vps",
     check: async () => {
+      if (!VPS_URL) return { ok: null, ms: 0 }; // não configurado
       const t = Date.now();
-      await fetch("https://backend-psi-orpin-13.vercel.app/", {
-        mode: "no-cors",
-        signal: AbortSignal.timeout(6000),
-      });
-      return { ok: true, ms: Date.now() - t };
+      try {
+        await fetch(VPS_URL, {
+          mode: "no-cors",
+          signal: AbortSignal.timeout(6000),
+        });
+        return { ok: true, ms: Date.now() - t };
+      } catch (e) {
+        return { ok: false, ms: Date.now() - t };
+      }
     },
   },
-  /* — LPs (adicionar quando disponíveis) —
-  { id: "lp1", label: "LP Reforma", check: async () => {
+  /* — LPs (descomentar quando disponíveis e adicionar pill no header) —
+  { id: "lp", check: async () => {
       const t = Date.now();
-      await fetch("https://bndigital.com.br/reforma", { mode: "no-cors", signal: AbortSignal.timeout(6000) });
+      await fetch("https://campanha.davidsoares.com.br", { mode: "no-cors", signal: AbortSignal.timeout(6000) });
       return { ok: true, ms: Date.now() - t };
   }}, */
 ];
@@ -1188,9 +1248,26 @@ const INFRA = [
 function applyInfra(id, result) {
   const dot = document.getElementById(`dot-${id}`);
   const ms  = document.getElementById(`ms-${id}`);
-  if (!dot) return;
+  const pill = document.getElementById(`pill-${id}`);
+
+  // result.ok === null → não configurado (mantém cinza, sem blink, tooltip explica)
+  if (result.ok === null) {
+    if (dot) dot.className = "svc-dot infra-dot";
+    if (pill) {
+      pill.classList.remove("err");
+      pill.title = (pill.title || "") + " (não configurado)";
+    }
+    if (ms) ms.textContent = "—";
+    return;
+  }
+
   const cls = !result.ok ? "err" : result.ms > 2000 ? "slow" : "ok";
-  dot.className = `infra-dot ${cls}`;
+
+  // Header pill (svc-dot)
+  if (dot) dot.className = `svc-dot infra-dot ${cls}`;
+  if (pill) pill.classList.toggle("err", !result.ok);
+
+  // Footer (compat: infra-dot existe nos dois)
   if (ms) ms.textContent = result.ok ? `${result.ms}ms` : "erro";
 }
 
