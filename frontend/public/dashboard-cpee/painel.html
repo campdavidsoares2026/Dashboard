@@ -568,12 +568,12 @@ body::before {
       <div class="cpee-badge" id="cpee-badge">SEM DADOS</div>
     </div>
 
-    <!-- GASTO HOJE -->
+    <!-- GASTO (período selecionado) -->
     <div class="card gasto-card">
-      <div class="lbl">Gasto Hoje</div>
+      <div class="lbl">Gasto <span class="period-tag" id="gh-period-tag"></span></div>
       <div class="big-val" style="color:var(--green)" id="gh-val">—</div>
       <div>
-        <div class="sub" id="gh-sub">— do orçamento diário</div>
+        <div class="sub" id="gh-sub">—</div>
         <div class="daily-track"><div class="daily-fill" id="gh-bar" style="width:0%"></div></div>
       </div>
     </div>
@@ -646,9 +646,9 @@ body::before {
       <div class="lbl" style="margin-bottom:2px">Status das Contas</div>
     </div>
 
-    <!-- Total spend -->
+    <!-- Total spend (período selecionado) -->
     <div class="card total-card">
-      <div class="lbl">Total Gasto · Mês</div>
+      <div class="lbl">Total Gasto <span class="period-tag" id="total-period-tag"></span></div>
       <div class="big-val" style="color:var(--yellow);text-align:center" id="total-val">—</div>
       <div class="sub" style="text-align:center" id="total-sub">— contas monitoradas</div>
     </div>
@@ -814,7 +814,7 @@ async function fetchData() {
     fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=data,spend,leads,eq,account_id&data=gte.${chartStart}&order=data.asc`, { headers: HDR }),
     fetch(`${SUPA_URL}/rest/v1/criativos_performance?select=*&spend=gte.50&cpee=gt.0&order=cpee.asc&limit=1`, { headers: HDR }),
     samePeriod ? null :
-      fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=impressoes,alcance,cliques,thruplay,data,account_id&data=gte.${periodStart}&data=lte.${periodEnd}&order=data.asc`, { headers: HDR }),
+      fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=impressoes,alcance,cliques,thruplay,spend,data,account_id&data=gte.${periodStart}&data=lte.${periodEnd}&order=data.asc`, { headers: HDR }),
   ];
 
   const [cR, smR, scR, crR, spR] = await Promise.all(fetches);
@@ -911,6 +911,11 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
   const alcance_per    = _per.reduce((a,b) => a + (b.alcance    || 0), 0);
   const cliques_per    = _per.reduce((a,b) => a + (b.cliques    || 0), 0);
   const thruplay_per   = _per.reduce((a,b) => a + (b.thruplay   || 0), 0);
+  const gasto_per      = _per.reduce((a,b) => a + (b.spend      || 0), 0);
+
+  // Dias únicos no período (para média diária)
+  const diasUnicos = new Set(_per.map(s => s.data)).size || 1;
+  const isHoje = periodStart === today && periodEnd === today;
 
   return {
     active, byAcct, gasto_hoje, gasto_mes, leads_mes, eq_mes,
@@ -918,6 +923,7 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
     dimMonth, dom, expPct, actPct, pacing,
     daysEl, chartDays, winner, cpl_mes,
     impressoes_per, alcance_per, cliques_per, thruplay_per,
+    gasto_per, diasUnicos, isHoje,
   };
 }
 
@@ -931,11 +937,22 @@ function render(m) {
   const cc = document.getElementById("cpee-card");
   cc.style.setProperty("--cpee-c", m.cpeeColor);
 
-  // ── GASTO HOJE ──
-  set("gh-val", BRL(m.gasto_hoje));
-  const dp = m.budget_d > 0 ? Math.min(m.gasto_hoje / m.budget_d * 100, 100) : 0;
-  set("gh-sub", `${dp.toFixed(0)}% do orçamento diário · Alvo ${BRL(m.budget_d)}/dia`);
-  css("gh-bar", "width", `${dp}%`);
+  // ── GASTO (período selecionado) ──
+  set("gh-val", BRL(m.gasto_per));
+  if (m.isHoje) {
+    // Período = só hoje → mantém comparação com orçamento diário
+    const dp = m.budget_d > 0 ? Math.min(m.gasto_per / m.budget_d * 100, 100) : 0;
+    set("gh-sub", `${dp.toFixed(0)}% do orçamento diário · Alvo ${BRL(m.budget_d)}/dia`);
+    css("gh-bar", "width", `${dp}%`);
+  } else {
+    // Período > 1 dia → média diária
+    const mediaDia = m.diasUnicos > 0 ? m.gasto_per / m.diasUnicos : 0;
+    set("gh-sub", `${m.diasUnicos} dia${m.diasUnicos !== 1 ? "s" : ""} · Média ${BRL(mediaDia)}/dia`);
+    // Barra mostra ritmo vs. budget total esperado para o período
+    const expectedTotal = m.budget_d * m.diasUnicos;
+    const ratio = expectedTotal > 0 ? Math.min(m.gasto_per / expectedTotal * 100, 100) : 0;
+    css("gh-bar", "width", `${ratio}%`);
+  }
 
   // ── META MENSAL ──
   set("meta-spent", BRL(m.gasto_mes));
@@ -957,10 +974,15 @@ function render(m) {
   set("alcance-val",    compact(m.alcance_per));
   set("thruplay-val",   compact(m.thruplay_per));
   set("cliques-val",    compact(m.cliques_per));
-  // Tag de período
-  const isMonth = periodStart === new Date().toISOString().slice(0,8) + "01" && periodEnd === new Date().toISOString().slice(0,10);
-  const tagEl = document.getElementById("period-tag");
-  if (tagEl) tagEl.textContent = isMonth ? "" : `${periodStart} → ${periodEnd}`;
+  // Tag de período (compartilhada por Impressões, Gasto, Total Gasto)
+  const _todayStr = new Date().toISOString().slice(0,10);
+  const isMonth = periodStart === _todayStr.slice(0,8) + "01" && periodEnd === _todayStr;
+  const isToday = periodStart === _todayStr && periodEnd === _todayStr;
+  const periodLabel = isMonth ? "· Mês" : isToday ? "· Hoje" : `· ${periodStart} → ${periodEnd}`;
+  ["period-tag", "gh-period-tag", "total-period-tag"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = periodLabel;
+  });
 
   // ── ACCOUNTS ──
   const acEl = document.getElementById("accts-card");
@@ -980,9 +1002,9 @@ function render(m) {
   }).join("");
   acEl.innerHTML = `<div class="lbl" style="margin-bottom:6px">Status das Contas</div>${pills}`;
 
-  // ── TOTAL ──
-  set("total-val", BRL(m.gasto_mes));
-  set("total-sub", `${m.active.length} conta${m.active.length !== 1 ? "s" : ""} ativa${m.active.length !== 1 ? "s" : ""}`);
+  // ── TOTAL (período selecionado) ──
+  set("total-val", BRL(m.gasto_per));
+  set("total-sub", `${m.active.length} conta${m.active.length !== 1 ? "s" : ""} ativa${m.active.length !== 1 ? "s" : ""} · ${m.diasUnicos} dia${m.diasUnicos !== 1 ? "s" : ""}`);
 
   // ── BAR CHART ──
   renderBars(m.chartDays);
