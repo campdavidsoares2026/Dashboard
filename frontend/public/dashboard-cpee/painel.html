@@ -636,6 +636,10 @@ body::before {
           <span class="svc-dot" id="dot-lp"></span>
           <span>LPs</span>
         </span>
+        <span class="svc-pill" id="pill-cron" title="Última execução do cron de coleta">
+          <span class="svc-dot" id="dot-cron"></span>
+          <span id="cron-lbl">Cron</span>
+        </span>
       </div>
       <div class="live-dot">AO VIVO</div>
       <div class="clock" id="clock">--:--:--</div>
@@ -1368,6 +1372,36 @@ const INFRA = [
     //   return { ok: true, ms: Date.now() - t };
     check: async () => ({ ok: null, ms: 0 }), // null → cinza "não configurado", não pisca
   },
+  {
+    // Cron — última execução salva em `execucoes`. Cor:
+    //  verde se < 24h, amarelo 24-48h, vermelho pulsante > 48h.
+    // Verde porque o pipeline está "fresco"; vermelho = ninguém percebeu
+    // que o cron travou e os dados estão envelhecendo.
+    id: "cron",
+    check: async () => {
+      const t = Date.now();
+      try {
+        const r = await fetch(
+          `${SUPA_URL}/rest/v1/execucoes?select=executado_em&order=executado_em.desc.nullslast&limit=1`,
+          { headers: HDR, signal: AbortSignal.timeout(6000) }
+        );
+        if (!r.ok) return { ok: false, ms: Date.now() - t };
+        const rows = await r.json();
+        if (!rows.length || !rows[0].executado_em) return { ok: false, ms: Date.now() - t };
+        const ageMs = Date.now() - new Date(rows[0].executado_em).getTime();
+        const ageH  = ageMs / 3_600_000;
+        return {
+          ok: ageH < 48,           // true→verde/amarelo  false→vermelho pulsante
+          ms: Math.round(ageH * 10) / 10, // armazena IDADE EM HORAS no campo ms
+          asHours: true,           // flag pro renderer interpretar
+          slow: ageH >= 24,        // amarelo se 24-48h
+          executado_em: rows[0].executado_em,
+        };
+      } catch {
+        return { ok: false, ms: Date.now() - t };
+      }
+    },
+  },
 ];
 
 function applyInfra(id, result) {
@@ -1383,6 +1417,30 @@ function applyInfra(id, result) {
       pill.title = (pill.title || "") + " (não configurado)";
     }
     if (ms) ms.textContent = "—";
+    return;
+  }
+
+  // Cron: result.asHours==true → semântica diferente
+  //   verde se idade < 24h, amarelo 24-48h, vermelho se >= 48h (ok=false)
+  //   label do pill mostra "Cron · 3h" em vez de "Cron"
+  if (result.asHours) {
+    const cls = !result.ok ? "err" : result.slow ? "slow" : "ok";
+    if (dot) dot.className = `svc-dot infra-dot ${cls}`;
+    if (pill) {
+      pill.classList.toggle("err", !result.ok);
+      const t = result.executado_em
+        ? new Date(result.executado_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+        : "—";
+      pill.title = `Cron — última execução: ${t} (${result.ms}h atrás)`;
+    }
+    const lbl = document.getElementById("cron-lbl");
+    if (lbl) {
+      const ageH = result.ms;
+      lbl.textContent = !result.ok
+        ? `Cron ${Math.floor(ageH)}h`     // travado
+        : ageH < 1 ? `Cron ${Math.round(ageH * 60)}m`
+        : `Cron ${Math.round(ageH)}h`;
+    }
     return;
   }
 

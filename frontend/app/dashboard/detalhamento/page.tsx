@@ -142,6 +142,7 @@ export default function DetalhamentoPage() {
         clusters={
           (clustersQ.data ?? []) as unknown as Record<string, unknown>[]
         }
+        periodLabel={`${monthAgo} → ${today}`}
       />
 
       <ClusterSelector

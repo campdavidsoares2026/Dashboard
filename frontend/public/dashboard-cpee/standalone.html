@@ -2148,6 +2148,11 @@ button:focus-visible {
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
+  <!-- jspdf + autotable: usados pelo botão "Exportar PDF". Lazy seria melhor mas
+       o overhead inicial é OK (~250KB combinados, comprimidos), pra não ter
+       latência no clique do usuário. -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 
   <script type="text/babel">
 
@@ -3240,6 +3245,158 @@ function LiveDot({ on = true }) {
   );
 }
 
+// ───────────────────────────── PDF Export ─────────────────────────────
+// Gera PDF executivo do período selecionado.
+// Usa jspdf + jspdf-autotable (carregados via CDN no <head>).
+function generatePDF({ agg, perAccount, creatives, clusters, periodLabel }) {
+  if (typeof window.jspdf === "undefined") {
+    alert("Biblioteca jsPDF não carregou. Recarregue a página.");
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const page = { w: 210, h: 297 };
+  const stamp = new Date().toLocaleString("pt-BR");
+
+  const BRLf = (n) => (Number(n) || 0).toLocaleString("pt-BR",
+    { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+  const NUMf = (n) => (Number(n) || 0).toLocaleString("pt-BR");
+
+  // ─── Capa ───────────────────────────────────────────────────────
+  doc.setFillColor(44, 62, 80);
+  doc.rect(0, 0, page.w, 60, "F");
+  doc.setTextColor(243, 156, 18);
+  doc.setFontSize(24);
+  doc.setFont("helvetica", "bold");
+  doc.text("CPEE Dashboard", 14, 25);
+  doc.setFontSize(11);
+  doc.setTextColor(232, 232, 232);
+  doc.setFont("helvetica", "normal");
+  doc.text("Dep. Federal David Soares · Podemos · São Paulo", 14, 33);
+  doc.setFontSize(9);
+  doc.text(`Período: ${periodLabel || "—"}  ·  Gerado em: ${stamp}`, 14, 41);
+
+  let y = 72;
+  doc.setTextColor(44, 62, 80);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Resumo do período", 14, y);
+  y += 6;
+
+  const t = agg?.totals || {};
+  doc.autoTable({
+    startY: y,
+    head: [["Métrica", "Valor"]],
+    body: [
+      ["CPEE Consolidado", BRLf(t.cpee || 0)],
+      ["Gasto Total", BRLf(t.spend || 0)],
+      ["Leads", NUMf(t.leads || 0)],
+      ["EQ", NUMf(t.eq || 0)],
+      ["Impressões", NUMf(t.impr || t.impressoes || 0)],
+      ["Alcance", NUMf(t.alc || t.alcance || 0)],
+      ["Cliques", NUMf(t.cli || t.cliques || 0)],
+      ["CTR", `${(t.ctr || 0).toFixed(2)}%`],
+      ["CPC", BRLf(t.cpc || 0)],
+      ["CPL", BRLf(t.cpl || 0)],
+    ],
+    headStyles: { fillColor: [243, 156, 18], textColor: 0, fontStyle: "bold" },
+    bodyStyles: { textColor: [44, 62, 80] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
+    margin: { left: 14, right: 14 },
+  });
+  y = doc.lastAutoTable.finalY + 12;
+
+  // ─── Performance por conta ──────────────────────────────────────
+  if (perAccount?.length) {
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Performance por conta", 14, y);
+    y += 4;
+    doc.autoTable({
+      startY: y,
+      head: [["Conta", "Gasto", "CPEE", "Leads", "CTR", "Classific."]],
+      body: perAccount.map((a) => [
+        String(a.nome || a.account_id || "—").substring(0, 36),
+        BRLf(a.spend),
+        BRLf(a.cpee),
+        NUMf(a.leads),
+        `${(a.ctr || 0).toFixed(2)}%`,
+        String(a.classificacao_cpee || "—"),
+      ]),
+      headStyles: { fillColor: [243, 156, 18], textColor: 0 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" },
+                      3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "center" } },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 12;
+  }
+
+  // ─── Top 10 criativos ───────────────────────────────────────────
+  if (creatives?.length) {
+    if (y > page.h - 60) { doc.addPage(); y = 20; }
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Top 10 criativos por gasto", 14, y);
+    y += 4;
+    const top = [...creatives].sort((a,b) => (Number(b.spend)||0) - (Number(a.spend)||0)).slice(0, 10);
+    doc.autoTable({
+      startY: y,
+      head: [["Criativo", "Pauta", "Gasto", "CPEE", "CTR", "Classific."]],
+      body: top.map((c) => [
+        String(c.ad_nome || c.nome || "—").substring(0, 38),
+        String(c.pauta || "—"),
+        BRLf(c.spend), BRLf(c.cpee),
+        `${(Number(c.ctr) || 0).toFixed(2)}%`,
+        String(c.classificacao || "—"),
+      ]),
+      headStyles: { fillColor: [243, 156, 18], textColor: 0 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: { 2: { halign: "right" }, 3: { halign: "right" },
+                      4: { halign: "right" }, 5: { halign: "center" } },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 12;
+  }
+
+  // ─── Top 10 clusters ────────────────────────────────────────────
+  if (clusters?.length) {
+    if (y > page.h - 60) { doc.addPage(); y = 20; }
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Top 10 clusters por gasto", 14, y);
+    y += 4;
+    const top = [...clusters].sort((a,b) => (Number(b.spend)||0) - (Number(a.spend)||0)).slice(0, 10);
+    doc.autoTable({
+      startY: y,
+      head: [["Cluster", "Gasto", "CPEE", "CTR", "Classific."]],
+      body: top.map((c) => [
+        String(c.cluster_nome || c.nome || "—").substring(0, 42),
+        BRLf(c.spend), BRLf(c.cpee),
+        `${(Number(c.ctr) || 0).toFixed(2)}%`,
+        String(c.classificacao || "—"),
+      ]),
+      headStyles: { fillColor: [243, 156, 18], textColor: 0 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" },
+                      3: { halign: "right" }, 4: { halign: "center" } },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  // ─── Footer ─────────────────────────────────────────────────────
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(`Página ${i} de ${totalPages}`, page.w - 14, page.h - 8, { align: "right" });
+    doc.text("CPEE Dashboard · paineltv-david.vercel.app", 14, page.h - 8);
+  }
+  doc.save(`relatorio-cpee-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
 // ───────────────────────────── Infrastructure Health Bar ─────────────────────────────
 // Health check para os 4 serviços. Tudo HTTPS direto exceto VPS (HTTP-only),
 // que vai pelo proxy /api/health/vps no Next.js (contorna mixed content).
@@ -3249,6 +3406,7 @@ function HealthBar({ supabaseUrl, supabaseKey }) {
     vercel: { ok: null, ms: 0 },
     vps:    { ok: null, ms: 0 },
     lp:     { ok: null, ms: 0 }, // null = não configurado, sem blink
+    cron:   { ok: null, ms: 0 }, // ms aqui é IDADE EM HORAS, não latência
   });
 
   React.useEffect(() => {
@@ -3284,6 +3442,28 @@ function HealthBar({ supabaseUrl, supabaseKey }) {
         } catch { return { ok: false, ms: Date.now() - t }; }
       },
       lp: async () => ({ ok: null, ms: 0 }), // não deployadas ainda
+      cron: async () => {
+        // Saúde do cron: idade da última `executado_em` em `execucoes`.
+        // ok=false (vermelho pulsante) se > 48h; slow (amarelo) se 24-48h; ok se < 24h.
+        if (!supabaseUrl || !supabaseKey) return { ok: false, ms: 0 };
+        try {
+          const r = await fetch(
+            `${supabaseUrl}/rest/v1/execucoes?select=executado_em&order=executado_em.desc.nullslast&limit=1`,
+            { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
+              signal: AbortSignal.timeout(6000) }
+          );
+          if (!r.ok) return { ok: false, ms: 0 };
+          const rows = await r.json();
+          if (!rows.length || !rows[0].executado_em) return { ok: false, ms: 0 };
+          const ageH = (Date.now() - new Date(rows[0].executado_em).getTime()) / 3_600_000;
+          return {
+            ok: ageH < 48,
+            ms: Math.round(ageH * 10) / 10,
+            slow: ageH >= 24,
+            executado_em: rows[0].executado_em,
+          };
+        } catch { return { ok: false, ms: 0 }; }
+      },
     };
 
     const run = async () => {
@@ -3302,7 +3482,10 @@ function HealthBar({ supabaseUrl, supabaseKey }) {
     { id: "vercel", label: "Vercel", title: "paineltv-david.vercel.app" },
     { id: "vps",    label: "VPS",    title: "VPS Hostinger (187.77.203.55)" },
     { id: "lp",     label: "LPs",    title: "Landing Pages (não deployadas ainda)" },
+    { id: "cron",   label: "Cron",   title: "Cron de coleta (Meta Ads → Supabase, 9h diário)" },
   ];
+
+  const cronAgeLabel = (h) => h < 1 ? `${Math.round(h * 60)}m` : `${Math.round(h)}h`;
 
   return (
     <div className="health-bar">
@@ -3310,6 +3493,25 @@ function HealthBar({ supabaseUrl, supabaseKey }) {
         const r = status[it.id];
         const isErr = r.ok === false;
         const isOk = r.ok === true;
+
+        // Cron: semântica diferente. `r.ms` armazena idade em horas, não latência.
+        if (it.id === "cron") {
+          const cls = r.ok === null ? "" : isErr ? "err" : r.slow ? "slow" : "ok";
+          const lastRun = r.executado_em
+            ? new Date(r.executado_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+            : "—";
+          return (
+            <span
+              key={it.id}
+              className={`health-pill ${isErr ? "err" : ""}`}
+              title={`${it.title} · última execução ${lastRun}${isOk ? ` (${r.ms}h atrás)` : ""}`}
+            >
+              <span className={`health-dot ${cls}`} />
+              <span>{it.label}{isOk ? ` ${cronAgeLabel(r.ms)}` : ""}</span>
+            </span>
+          );
+        }
+
         const cls = r.ok === null ? "" : isErr ? "err" : r.ms > 2000 ? "slow" : "ok";
         return (
           <span
@@ -5474,7 +5676,7 @@ function ThemeToggle({ currentTone, setBgTone }) {
   );
 }
 
-function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, onOpenSettings, onOpenMeta, countdown, currentTone, setBgTone, supabaseUrl, supabaseKey }) {
+function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, onOpenSettings, onOpenMeta, countdown, currentTone, setBgTone, supabaseUrl, supabaseKey, onExportPDF }) {
   const statusLabel = {
     mock: "Mock",
     loading: "Carregando…",
@@ -5501,6 +5703,13 @@ function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, 
             <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 3v13M8 10l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Importar Meta
+        </button>
+        <button className="btn-meta" onClick={onExportPDF} title="Gerar relatório PDF do período selecionado">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M14 2v6h6M9 13h6M9 17h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          PDF
         </button>
         <button className={`conn-pill conn-pill-${status}`} onClick={onOpenSettings} title="Configurar Supabase">
           <span className="conn-dot" />
@@ -5694,6 +5903,13 @@ function Dashboard() {
         setBgTone={(v) => { setTweak("bg_tone", v); try { localStorage.setItem("dashboard_theme", v); } catch {} }}
         supabaseUrl={config?.url}
         supabaseKey={config?.key}
+        onExportPDF={() => generatePDF({
+          agg,
+          perAccount: agg?.perAccount,
+          creatives,
+          clusters,
+          periodLabel,
+        })}
       />
 
       <CandidateHero
