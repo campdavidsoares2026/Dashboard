@@ -264,6 +264,30 @@ body::before {
   font-variant-numeric: tabular-nums;
 }
 
+.big-val-row {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+
+/* Comparativo período vs período anterior — pequeno badge ao lado do valor */
+.delta {
+  font-family: var(--mono);
+  font-size: clamp(11px, 0.9vw, 14px);
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  letter-spacing: -.01em;
+  /* default = neutral */
+  background: rgba(255,255,255,.06);
+  color: var(--t2);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.delta.up   { background: rgba(239,68,68,.12); color: var(--red);   border-color: rgba(239,68,68,.3); }
+.delta.down { background: rgba(108,180,84,.12); color: var(--green); border-color: rgba(108,180,84,.3); }
+.delta.up.inverse   { background: rgba(108,180,84,.12); color: var(--green); border-color: rgba(108,180,84,.3); }
+.delta.down.inverse { background: rgba(239,68,68,.12); color: var(--red);   border-color: rgba(239,68,68,.3); }
+.delta:empty { display: none; }
+
 .sub { font-size: 12px; color: var(--t2); font-weight: 500; }
 
 /* ─────── ROW-1: BIG KPIs ─────── */
@@ -618,14 +642,20 @@ body::before {
     <!-- CPEE -->
     <div class="card cpee-card" id="cpee-card">
       <div class="lbl">CPEE Consolidado</div>
-      <div class="big-val" id="cpee-val">—</div>
+      <div class="big-val-row">
+        <div class="big-val" id="cpee-val">—</div>
+        <span class="delta" id="cpee-delta"></span>
+      </div>
       <div class="cpee-badge" id="cpee-badge">SEM DADOS</div>
     </div>
 
     <!-- GASTO (período selecionado) -->
     <div class="card gasto-card">
       <div class="lbl">Gasto <span class="period-tag" id="gh-period-tag"></span></div>
-      <div class="big-val" style="color:var(--green)" id="gh-val">—</div>
+      <div class="big-val-row">
+        <div class="big-val" style="color:var(--green)" id="gh-val">—</div>
+        <span class="delta" id="gh-delta"></span>
+      </div>
       <div>
         <div class="sub" id="gh-sub">—</div>
         <div class="daily-track"><div class="daily-fill" id="gh-bar" style="width:0%"></div></div>
@@ -702,8 +732,11 @@ body::before {
 
     <!-- Total spend (período selecionado) -->
     <div class="card total-card">
-      <div class="lbl">Total Gasto <span class="period-tag" id="total-period-tag"></span></div>
-      <div class="big-val" style="color:var(--yellow);text-align:center" id="total-val">—</div>
+      <div class="lbl" style="text-align:center">Total Gasto <span class="period-tag" id="total-period-tag"></span></div>
+      <div class="big-val-row" style="justify-content:center">
+        <div class="big-val" style="color:var(--yellow)" id="total-val">—</div>
+        <span class="delta" id="total-delta"></span>
+      </div>
       <div class="sub" style="text-align:center" id="total-sub">— contas monitoradas</div>
     </div>
 
@@ -853,6 +886,17 @@ function applyCustomPeriod() {
   }
 }
 
+/** Computa o período anterior de mesmo tamanho (para comparativo). */
+function previousPeriod(start, end) {
+  // Tamanho em dias inclusivos
+  const d1 = new Date(start + "T00:00:00");
+  const d2 = new Date(end + "T00:00:00");
+  const len = Math.round((d2 - d1) / 86400000) + 1;
+  const prevEnd = new Date(d1.getTime() - 86400000);
+  const prevStart = new Date(prevEnd.getTime() - (len - 1) * 86400000);
+  return { start: localDateStr(prevStart), end: localDateStr(prevEnd), len };
+}
+
 async function fetchData() {
   const today      = localDateStr();
   const monthStart = today.slice(0, 8) + "01";
@@ -860,7 +904,9 @@ async function fetchData() {
 
   // snapsPeriod = período selecionado (para métricas impressões/alcance/thruplay/cliques)
   // snapsMonth  = sempre mês atual (para CPEE, Meta Mensal, Gasto)
+  // snapsPrev   = período anterior de mesmo tamanho (para comparativos)
   const samePeriod = periodStart === monthStart && periodEnd === today;
+  const prev = previousPeriod(periodStart, periodEnd);
 
   const fetches = [
     fetch(`${SUPA_URL}/rest/v1/metricas_conta?select=*&order=executado_em.desc`, { headers: HDR }),
@@ -869,9 +915,10 @@ async function fetchData() {
     fetch(`${SUPA_URL}/rest/v1/criativos_performance?select=*&spend=gte.50&cpee=gt.0&order=cpee.asc&limit=1`, { headers: HDR }),
     samePeriod ? null :
       fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=impressoes,alcance,cliques,thruplay,spend,data,account_id&data=gte.${periodStart}&data=lte.${periodEnd}&order=data.asc`, { headers: HDR }),
+    fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=spend,leads,eq,data,account_id&data=gte.${prev.start}&data=lte.${prev.end}&order=data.asc`, { headers: HDR }),
   ];
 
-  const [cR, smR, scR, crR, spR] = await Promise.all(fetches);
+  const [cR, smR, scR, crR, spR, prevR] = await Promise.all(fetches);
 
   if (!cR.ok) throw new Error(`API ${cR.status}`);
 
@@ -882,6 +929,8 @@ async function fetchData() {
     // Fallback para snapsMonthData se Supabase retornar erro (ex: cache de schema desatualizado)
     snapsPeriodData = Array.isArray(raw) ? raw : snapsMonthData;
   }
+  const snapsPrevRaw = prevR && prevR.ok ? await prevR.json() : [];
+  const snapsPrev = Array.isArray(snapsPrevRaw) ? snapsPrevRaw : [];
 
   return {
     contas:       await cR.json(),
@@ -889,13 +938,15 @@ async function fetchData() {
     snapsChart:   await scR.json(),
     criativos:    await crR.json(),
     snapsPeriod:  snapsPeriodData,
+    snapsPrev,
+    prevPeriodMeta: prev,
   };
 }
 
 /* ═══════════════════════════════════════════
    COMPUTE
 ═══════════════════════════════════════════ */
-function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
+function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod, snapsPrev, prevPeriodMeta }) {
   const today = localDateStr();
   const now   = new Date();
 
@@ -971,6 +1022,17 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
   const diasUnicos = new Set(_per.map(s => s.data)).size || 1;
   const isHoje = periodStart === today && periodEnd === today;
 
+  // ─── COMPARATIVO período-vs-período anterior ───
+  const _prev = Array.isArray(snapsPrev) ? snapsPrev : [];
+  const gasto_prev = _prev.reduce((a,b) => a + (b.spend || 0), 0);
+  const eq_prev    = _prev.reduce((a,b) => a + (b.eq    || 0), 0);
+  const cpee_prev  = eq_prev > 0 ? gasto_prev / eq_prev : 0;
+
+  // Delta = (curr - prev) / prev * 100. Retorna null se prev for 0 (sem base).
+  const pct = (curr, prev) => prev > 0 ? ((curr - prev) / prev) * 100 : null;
+  const cpee_delta_pct  = pct(cpee, cpee_prev);
+  const gasto_delta_pct = pct(gasto_per, gasto_prev);
+
   return {
     active, byAcct, gasto_hoje, gasto_mes, leads_mes, eq_mes,
     cpee, classif, cpeeColor, meta, budget_d,
@@ -978,21 +1040,49 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod }) {
     daysEl, chartDays, winner, cpl_mes,
     impressoes_per, alcance_per, cliques_per, thruplay_per,
     gasto_per, diasUnicos, isHoje,
+    cpee_prev, gasto_prev, cpee_delta_pct, gasto_delta_pct, prevPeriodMeta,
   };
 }
 
 /* ═══════════════════════════════════════════
    RENDER
 ═══════════════════════════════════════════ */
+/**
+ * Renderiza o badge de delta (comparativo vs período anterior).
+ * @param id     elemento alvo (span.delta vazio)
+ * @param pct    delta em %, ou null se sem base
+ * @param inverse true se valor MENOR é melhor (ex: CPEE). false p/ valores neutros (ex: Gasto)
+ */
+function renderDelta(id, pct, { inverse = false, neutralBelow = 1 } = {}) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (pct == null) {
+    el.textContent = "";
+    el.className = "delta";
+    return;
+  }
+  const abs = Math.abs(pct);
+  const isStable = abs < neutralBelow;
+  const up = pct > 0;
+  const arrow = isStable ? "→" : up ? "↑" : "↓";
+  const sign = up ? "+" : pct < 0 ? "" : "";
+  el.textContent = `${arrow} ${sign}${pct.toFixed(1)}% vs período anterior`;
+  el.className = "delta" + (isStable ? "" : ` ${up ? "up" : "down"}${inverse ? " inverse" : ""}`);
+}
+
 function render(m) {
   // ── CPEE ──
   set("cpee-val", m.cpee > 0 ? BRLf(m.cpee) : "—");
   set("cpee-badge", m.classif);
+  // CPEE: menor é melhor → inverse=true (↑ vermelho, ↓ verde)
+  renderDelta("cpee-delta", m.cpee_delta_pct, { inverse: true });
   const cc = document.getElementById("cpee-card");
   cc.style.setProperty("--cpee-c", m.cpeeColor);
 
   // ── GASTO (período selecionado) ──
   set("gh-val", BRL(m.gasto_per));
+  // Gasto: informativo (sem inverse) → ↑ vermelho, ↓ verde
+  renderDelta("gh-delta", m.gasto_delta_pct);
   if (m.isHoje) {
     // Período = só hoje → mantém comparação com orçamento diário
     const dp = m.budget_d > 0 ? Math.min(m.gasto_per / m.budget_d * 100, 100) : 0;
@@ -1058,6 +1148,7 @@ function render(m) {
 
   // ── TOTAL (período selecionado) ──
   set("total-val", BRL(m.gasto_per));
+  renderDelta("total-delta", m.gasto_delta_pct);
   set("total-sub", `${m.active.length} conta${m.active.length !== 1 ? "s" : ""} ativa${m.active.length !== 1 ? "s" : ""} · ${m.diasUnicos} dia${m.diasUnicos !== 1 ? "s" : ""}`);
 
   // ── BAR CHART ──
