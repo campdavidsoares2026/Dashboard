@@ -587,12 +587,10 @@ body::before {
           <span class="svc-dot" id="dot-vps"></span>
           <span>VPS</span>
         </span>
-        <!-- LP pill: descomentar quando URLs estiverem disponíveis
-        <span class="svc-pill" id="pill-lp" title="Landing Pages">
+        <span class="svc-pill" id="pill-lp" title="Landing Pages (não deployadas ainda)">
           <span class="svc-dot" id="dot-lp"></span>
           <span>LPs</span>
         </span>
-        -->
       </div>
       <div class="live-dot">AO VIVO</div>
       <div class="clock" id="clock">--:--:--</div>
@@ -735,25 +733,7 @@ body::before {
   <!-- ═══ FOOTER ═══ -->
   <footer class="footer">
 
-    <!-- Saúde da Infraestrutura (latência em ms; status visual está no header) -->
-    <div class="infra-bar">
-      <span class="infra-item">
-        <span>Banco</span>
-        <span class="infra-ms" id="ms-db">—</span>
-      </span>
-      <span class="infra-sep">|</span>
-      <span class="infra-item">
-        <span>Vercel</span>
-        <span class="infra-ms" id="ms-vercel">—</span>
-      </span>
-      <span class="infra-sep">|</span>
-      <span class="infra-item">
-        <span>VPS</span>
-        <span class="infra-ms" id="ms-vps">—</span>
-      </span>
-    </div>
-
-    <!-- Info footer -->
+    <!-- Info footer (status visual da infraestrutura está no header) -->
     <div class="footer-info">
       <span>CPEE Painel · v1.0 · <a href="/dashboard-cpee/standalone.html">→ Painel analítico completo</a></span>
       <span id="last-sync">—</span>
@@ -1193,10 +1173,6 @@ function showErr(msg) {
 /* ═══════════════════════════════════════════
    INFRAESTRUTURA — HEALTH CHECK
 ═══════════════════════════════════════════ */
-// VPS URL: trocar pelo endereço real quando configurado. Deixar string vazia
-// mantém o pill em estado "não configurado" (cinza, sem blink).
-const VPS_URL = ""; // ex: "https://api.davidsoares.com.br/health"
-
 const INFRA = [
   {
     id: "db",
@@ -1224,25 +1200,27 @@ const INFRA = [
   {
     id: "vps",
     check: async () => {
-      if (!VPS_URL) return { ok: null, ms: 0 }; // não configurado
+      // Browser can't fetch http://VPS:8000 from HTTPS (mixed content).
+      // Use the Next.js server-side proxy at /api/health/vps which does the
+      // check from Vercel edge and returns {ok, ms, status}.
       const t = Date.now();
       try {
-        await fetch(VPS_URL, {
-          mode: "no-cors",
-          signal: AbortSignal.timeout(6000),
-        });
-        return { ok: true, ms: Date.now() - t };
-      } catch (e) {
+        const r = await fetch("/api/health/vps", { signal: AbortSignal.timeout(7000) });
+        if (!r.ok) return { ok: false, ms: Date.now() - t };
+        const data = await r.json();
+        return { ok: !!data.ok, ms: data.ms ?? (Date.now() - t) };
+      } catch {
         return { ok: false, ms: Date.now() - t };
       }
     },
   },
-  /* — LPs (descomentar quando disponíveis e adicionar pill no header) —
-  { id: "lp", check: async () => {
-      const t = Date.now();
-      await fetch("https://campanha.davidsoares.com.br", { mode: "no-cors", signal: AbortSignal.timeout(6000) });
-      return { ok: true, ms: Date.now() - t };
-  }}, */
+  {
+    id: "lp",
+    // Quando as LPs forem deployadas, trocar pelo check real:
+    //   await fetch("https://campanha.davidsoares.com.br", { mode: "no-cors", signal: AbortSignal.timeout(6000) });
+    //   return { ok: true, ms: Date.now() - t };
+    check: async () => ({ ok: null, ms: 0 }), // null → cinza "não configurado", não pisca
+  },
 ];
 
 function applyInfra(id, result) {
