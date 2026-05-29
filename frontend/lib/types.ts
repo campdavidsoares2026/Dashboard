@@ -102,3 +102,41 @@ export interface Recomendacao {
 }
 
 export type Period = { start: string; end: string };
+
+export interface DemografiaCell {
+  account_id: string;
+  conta_nome: string;
+  age: string;              // "18-24", "25-34", ..., "65+"
+  gender: "male" | "female" | "unknown";
+  periodo: string;
+  data_inicio: string;
+  data_fim: string;
+  spend: number;
+  impressoes: number;
+  alcance: number;
+  cliques: number;
+  leads: number;
+  eq: number;
+  cpee: number;
+  ctr: number;
+  cpc: number;
+}
+
+export interface HorarioCell {
+  account_id: string;
+  conta_nome: string;
+  hora: string;             // "00:00:00 - 00:59:59"
+  hora_int: number;         // 0-23
+  periodo: string;
+  data_inicio: string;
+  data_fim: string;
+  spend: number;
+  impressoes: number;
+  alcance: number;
+  cliques: number;
+  leads: number;
+  eq: number;
+  cpee: number;
+  ctr: number;
+  cpc: number;
+}

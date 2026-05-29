@@ -5,6 +5,8 @@ import {
   useAccounts,
   useClusters,
   useCriativos,
+  useDemografia,
+  useHorarios,
   useMetricasConta,
   useRecomendacoes,
   useSnapshots,
@@ -14,6 +16,8 @@ import ComparisonTable from "./components/ComparisonTable";
 import CampaignsByAccount from "./components/CampaignsByAccount";
 import RecommendationHistory from "./components/RecommendationHistory";
 import ExportButtons from "./components/ExportButtons";
+import DemografiaChart from "./components/DemografiaChart";
+import HorariosHeatmap from "./components/HorariosHeatmap";
 
 const today = new Date().toISOString().slice(0, 10);
 const monthAgo = new Date(Date.now() - 30 * 86400000)
@@ -41,6 +45,8 @@ export default function DetalhamentoPage() {
     end: today,
     accounts: activeAccounts,
   });
+  const demoQ = useDemografia({ periodo: "30d" });
+  const horariosQ = useHorarios({ periodo: "30d" });
 
   const allClusterNames = useMemo(
     () => [
@@ -145,6 +151,16 @@ export default function DetalhamentoPage() {
       />
 
       <ComparisonTable clusters={compareClusters} />
+
+      <DemografiaChart
+        rows={demoQ.data ?? []}
+        accountFilter={accounts}
+      />
+
+      <HorariosHeatmap
+        rows={horariosQ.data ?? []}
+        accountFilter={accounts}
+      />
 
       <CampaignsByAccount
         metricas={metricasQ.data ?? []}

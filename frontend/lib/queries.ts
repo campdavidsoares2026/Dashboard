@@ -10,6 +10,8 @@ import type {
   Criativo,
   Cluster,
   Recomendacao,
+  DemografiaCell,
+  HorarioCell,
 } from "./types";
 
 const STALE = 1000 * 60 * 2; // 2min
@@ -118,6 +120,40 @@ export function useRecomendacoes(limit = 30) {
       sb<Recomendacao[]>(
         `recomendacoes?select=*&order=executado_em.desc.nullslast&limit=${limit}`
       ),
+    staleTime: STALE,
+    refetchInterval: REFRESH,
+  });
+}
+
+/** Breakdown demográfico (age × gender) por conta, periodo "30d" default. */
+export function useDemografia(opts: { periodo?: string; accounts?: string[] } = {}) {
+  const { periodo = "30d", accounts } = opts;
+  return useQuery<DemografiaCell[]>({
+    queryKey: ["demografia", { periodo, accounts }],
+    queryFn: () => {
+      const parts = [`select=*`, `periodo=eq.${periodo}`, `order=spend.desc`];
+      if (accounts && accounts.length > 0) {
+        parts.push(`account_id=in.(${accounts.map(encodeURIComponent).join(",")})`);
+      }
+      return sb<DemografiaCell[]>(`demografia_performance?${parts.join("&")}`);
+    },
+    staleTime: STALE,
+    refetchInterval: REFRESH,
+  });
+}
+
+/** Breakdown horário (0-23h) por conta, periodo "30d" default. */
+export function useHorarios(opts: { periodo?: string; accounts?: string[] } = {}) {
+  const { periodo = "30d", accounts } = opts;
+  return useQuery<HorarioCell[]>({
+    queryKey: ["horarios", { periodo, accounts }],
+    queryFn: () => {
+      const parts = [`select=*`, `periodo=eq.${periodo}`, `order=hora_int.asc`];
+      if (accounts && accounts.length > 0) {
+        parts.push(`account_id=in.(${accounts.map(encodeURIComponent).join(",")})`);
+      }
+      return sb<HorarioCell[]>(`horarios_performance?${parts.join("&")}`);
+    },
     staleTime: STALE,
     refetchInterval: REFRESH,
   });
