@@ -1,0 +1,9 @@
+{
+  "experimentalServices": {
+    "cpee-dashboard-api": {
+      "type": "web",
+      "routePrefix": "/",
+      "buildCommand": "pip install -r backend/requirements.txt"
+    }
+  }
+}
