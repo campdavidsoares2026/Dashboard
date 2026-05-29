@@ -116,12 +116,18 @@ body::before {
 /* ─────── METRICS ROW ─────── */
 .row-metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
 }
 .metric-card {
   display: flex; flex-direction: column; justify-content: center;
   gap: 2px; padding: 10px 14px;
+}
+/* Cards de insight (demografia, horário) usam font menor pra acomodar texto */
+.metric-card.insight .metric-val {
+  font-size: clamp(13px, 1.4vw, 18px);
+  font-family: var(--font);
+  letter-spacing: -.02em;
 }
 .metric-val {
   font-size: clamp(18px, 2vw, 28px);
@@ -730,6 +736,16 @@ body::before {
       <div class="lbl">Cliques no Link</div>
       <div class="metric-val" id="cliques-val">—</div>
     </div>
+    <div class="card metric-card insight">
+      <div class="lbl">👥 Audiência</div>
+      <div class="metric-val" id="audiencia-val">—</div>
+      <div class="sub" id="audiencia-sub" style="font-size:9px;color:var(--t3);margin-top:2px">por gasto · últ. 30 dias</div>
+    </div>
+    <div class="card metric-card insight">
+      <div class="lbl">⏰ Pico do dia</div>
+      <div class="metric-val" id="pico-val">—</div>
+      <div class="sub" id="pico-sub" style="font-size:9px;color:var(--t3);margin-top:2px">maior gasto · últ. 30 dias</div>
+    </div>
   </div>
 
   <!-- ═══ ROW 2 — SECONDARY ═══ -->
@@ -956,9 +972,12 @@ async function fetchData() {
     samePeriod ? null :
       fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=impressoes,alcance,cliques,thruplay,spend,data,account_id&data=gte.${periodStart}&data=lte.${periodEnd}&order=data.asc`, { headers: HDR }),
     fetch(`${SUPA_URL}/rest/v1/snapshots_diarios?select=spend,leads,eq,data,account_id&data=gte.${prev.start}&data=lte.${prev.end}&order=data.asc`, { headers: HDR }),
+    // Insights agregados (últimos 30d via populate_demografia_horarios.py)
+    fetch(`${SUPA_URL}/rest/v1/demografia_performance?select=age,gender,spend,cpee&periodo=eq.30d`, { headers: HDR }),
+    fetch(`${SUPA_URL}/rest/v1/horarios_performance?select=hora_int,spend,ctr&periodo=eq.30d`, { headers: HDR }),
   ];
 
-  const [cR, smR, scR, crR, spR, prevR] = await Promise.all(fetches);
+  const [cR, smR, scR, crR, spR, prevR, demoR, horaR] = await Promise.all(fetches);
 
   if (!cR.ok) throw new Error(`API ${cR.status}`);
 
@@ -971,6 +990,8 @@ async function fetchData() {
   }
   const snapsPrevRaw = prevR && prevR.ok ? await prevR.json() : [];
   const snapsPrev = Array.isArray(snapsPrevRaw) ? snapsPrevRaw : [];
+  const demoRaw = demoR && demoR.ok ? await demoR.json() : [];
+  const horaRaw = horaR && horaR.ok ? await horaR.json() : [];
 
   return {
     contas:       await cR.json(),
@@ -980,13 +1001,15 @@ async function fetchData() {
     snapsPeriod:  snapsPeriodData,
     snapsPrev,
     prevPeriodMeta: prev,
+    demografia:   Array.isArray(demoRaw) ? demoRaw : [],
+    horarios:     Array.isArray(horaRaw) ? horaRaw : [],
   };
 }
 
 /* ═══════════════════════════════════════════
    COMPUTE
 ═══════════════════════════════════════════ */
-function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod, snapsPrev, prevPeriodMeta }) {
+function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod, snapsPrev, prevPeriodMeta, demografia, horarios }) {
   const today = localDateStr();
   const now   = new Date();
 
@@ -1082,6 +1105,54 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod, snaps
   const cpee_delta_pct  = pct(cpee, cpee_prev);
   const gasto_delta_pct = pct(gasto_per, gasto_prev);
 
+  // ─── Insights demografia (top combo age × gender por gasto) ───
+  const _demo = Array.isArray(demografia) ? demografia : [];
+  let topDemo = null;
+  if (_demo.length) {
+    // Agrupa por (age, gender) somando spend de todas as contas
+    const byCombo = new Map();
+    let totalDemo = 0;
+    for (const d of _demo) {
+      const k = `${d.age}|${d.gender}`;
+      byCombo.set(k, (byCombo.get(k) || 0) + (Number(d.spend) || 0));
+      totalDemo += Number(d.spend) || 0;
+    }
+    let bestK = null, bestSpend = 0;
+    for (const [k, s] of byCombo) {
+      if (s > bestSpend) { bestSpend = s; bestK = k; }
+    }
+    if (bestK) {
+      const [age, gender] = bestK.split("|");
+      const genderShort = gender === "male" ? "H" : gender === "female" ? "M" : "?";
+      topDemo = {
+        label: `${genderShort} ${age}`,
+        pct: totalDemo > 0 ? Math.round((bestSpend / totalDemo) * 100) : 0,
+      };
+    }
+  }
+
+  // ─── Insights horários (pico do dia por gasto) ───
+  const _hora = Array.isArray(horarios) ? horarios : [];
+  let topHora = null;
+  if (_hora.length) {
+    // Agrupa por hora_int somando spend
+    const byHora = new Map();
+    for (const h of _hora) {
+      const k = h.hora_int;
+      byHora.set(k, (byHora.get(k) || 0) + (Number(h.spend) || 0));
+    }
+    let bestH = -1, bestSpend = 0;
+    for (const [h, s] of byHora) {
+      if (s > bestSpend) { bestSpend = s; bestH = h; }
+    }
+    if (bestH >= 0) {
+      topHora = {
+        label: `${String(bestH).padStart(2, "0")}h`,
+        spend: bestSpend,
+      };
+    }
+  }
+
   return {
     active, byAcct, gasto_hoje, gasto_mes, leads_mes, eq_mes,
     cpee, classif, cpeeColor, meta, budget_d,
@@ -1090,6 +1161,7 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod, snaps
     impressoes_per, alcance_per, cliques_per, thruplay_per,
     gasto_per, diasUnicos, isHoje,
     cpee_prev, gasto_prev, cpee_delta_pct, gasto_delta_pct, prevPeriodMeta,
+    topDemo, topHora,
   };
 }
 
@@ -1167,6 +1239,22 @@ function render(m) {
   set("alcance-val",    compact(m.alcance_per));
   set("thruplay-val",   compact(m.thruplay_per));
   set("cliques-val",    compact(m.cliques_per));
+
+  // ── INSIGHTS demografia + horário (sempre 30d, alimentados pelo cron) ──
+  if (m.topDemo) {
+    set("audiencia-val", m.topDemo.label);
+    set("audiencia-sub", `${m.topDemo.pct}% do gasto · últ. 30 dias`);
+  } else {
+    set("audiencia-val", "—");
+    set("audiencia-sub", "sem dados");
+  }
+  if (m.topHora) {
+    set("pico-val", m.topHora.label);
+    set("pico-sub", `${BRL(m.topHora.spend)} de gasto · últ. 30 dias`);
+  } else {
+    set("pico-val", "—");
+    set("pico-sub", "sem dados");
+  }
   // Tag de período (compartilhada por Impressões, Gasto, Total Gasto)
   const _todayStr = localDateStr();
   const isMonth = periodStart === _todayStr.slice(0,8) + "01" && periodEnd === _todayStr;
