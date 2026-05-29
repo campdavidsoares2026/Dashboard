@@ -522,6 +522,42 @@ button { font-family: inherit; cursor: pointer; }
 .conn-pill-error { color: var(--accent-hot); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.06); }
 .conn-pill-error .conn-dot { background: var(--accent-hot); }
 
+/* ─────────────────────────── INFRA HEALTH PILLS (header) ─────────────────────────── */
+.health-bar {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 4px;
+}
+.health-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-divider);
+  border-radius: 999px;
+  cursor: default;
+  transition: all 0.18s;
+}
+.health-pill:hover { border-color: var(--border-hover); color: var(--text-primary); }
+.health-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.health-dot.ok   { background: var(--accent-success); box-shadow: 0 0 6px rgba(16,185,129,0.7); }
+.health-dot.slow { background: var(--accent-warm);    box-shadow: 0 0 6px rgba(245,158,11,0.7); }
+.health-dot.err  { background: var(--accent-hot); animation: health-blink 0.9s ease-in-out infinite; }
+.health-pill.err {
+  color: var(--accent-hot);
+  border-color: rgba(239,68,68,0.45);
+  background: rgba(239,68,68,0.08);
+}
+@keyframes health-blink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.85), 0 0 8px rgba(239,68,68,0.9); opacity: 1; }
+  50%      { box-shadow: 0 0 0 6px rgba(239,68,68,0),   0 0 0 rgba(239,68,68,0);    opacity: .45; }
+}
+
 /* ─────────────────────────── MODAL ─────────────────────────── */
 .modal-backdrop {
   position: fixed; inset: 0;
@@ -2702,7 +2738,17 @@ function mulberry32(seed) {
 
 // Anchor "today" to the most recent date present in real data (cron writes daily at 09:00).
 // Falls back to system date if no live data is loaded yet.
-const TODAY = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z");
+//
+// CRITICAL: use LOCAL date (not UTC). new Date().toISOString() returns UTC,
+// which "rolls over" to tomorrow after 21:00 BR (UTC-3), making period queries
+// return zero rows. localDateStr() composes from local getFullYear/Month/Date.
+function localDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+const TODAY = new Date(localDateStr() + "T00:00:00Z");
 const START = new Date("2026-01-01T00:00:00Z");
 const TOTAL_DAYS = Math.round((TODAY - START) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -2978,6 +3024,7 @@ function aggregate(daily, accounts, startISO, endISO, accountId = null) {
 
 // Period presets
 const PERIOD_PRESETS = [
+  { id: "hoje", label: "Hoje", days: 1 },
   { id: "7d", label: "7 dias", days: 7 },
   { id: "14d", label: "14 dias", days: 14 },
   { id: "30d", label: "30 dias", days: 30 },
@@ -2989,6 +3036,9 @@ const PERIOD_PRESETS = [
 ];
 
 function rangeFromPreset(presetId, customStart, customEnd) {
+  // fmt — sempre data local YYYY-MM-DD (não UTC; ver localDateStr).
+  // Para "TODAY" e datas derivadas (que já estão em meia-noite UTC) usamos
+  // toISOString().slice(0,10) que é correto por construção.
   const fmt = (d) => d.toISOString().slice(0, 10);
   if (presetId === "ytd") {
     return { start: "2026-01-01", end: fmt(TODAY) };
@@ -3187,6 +3237,92 @@ function LiveDot({ on = true }) {
       <span className="live-dot-core" />
       <span className="live-dot-ring" />
     </span>
+  );
+}
+
+// ───────────────────────────── Infrastructure Health Bar ─────────────────────────────
+// Health check para os 4 serviços. Tudo HTTPS direto exceto VPS (HTTP-only),
+// que vai pelo proxy /api/health/vps no Next.js (contorna mixed content).
+function HealthBar({ supabaseUrl, supabaseKey }) {
+  const [status, setStatus] = React.useState({
+    db:     { ok: null, ms: 0 },
+    vercel: { ok: null, ms: 0 },
+    vps:    { ok: null, ms: 0 },
+    lp:     { ok: null, ms: 0 }, // null = não configurado, sem blink
+  });
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const checks = {
+      db: async () => {
+        if (!supabaseUrl || !supabaseKey) return { ok: false, ms: 0 };
+        const t = Date.now();
+        try {
+          const r = await fetch(`${supabaseUrl}/rest/v1/execucoes?select=id&limit=1`, {
+            headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
+            signal: AbortSignal.timeout(6000),
+          });
+          return { ok: r.ok, ms: Date.now() - t };
+        } catch { return { ok: false, ms: Date.now() - t }; }
+      },
+      vercel: async () => {
+        const t = Date.now();
+        try {
+          await fetch("https://paineltv-david.vercel.app/dashboard-cpee/standalone.html", {
+            mode: "no-cors", signal: AbortSignal.timeout(6000),
+          });
+          return { ok: true, ms: Date.now() - t };
+        } catch { return { ok: false, ms: Date.now() - t }; }
+      },
+      vps: async () => {
+        const t = Date.now();
+        try {
+          const r = await fetch("/api/health/vps", { signal: AbortSignal.timeout(7000) });
+          if (!r.ok) return { ok: false, ms: Date.now() - t };
+          const d = await r.json();
+          return { ok: !!d.ok, ms: d.ms ?? (Date.now() - t) };
+        } catch { return { ok: false, ms: Date.now() - t }; }
+      },
+      lp: async () => ({ ok: null, ms: 0 }), // não deployadas ainda
+    };
+
+    const run = async () => {
+      const entries = await Promise.all(
+        Object.entries(checks).map(async ([id, fn]) => [id, await fn()])
+      );
+      if (!cancelled) setStatus(Object.fromEntries(entries));
+    };
+    run();
+    const iv = setInterval(run, 60_000); // re-check 1×/min
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [supabaseUrl, supabaseKey]);
+
+  const items = [
+    { id: "db",     label: "Banco",  title: "Supabase" },
+    { id: "vercel", label: "Vercel", title: "paineltv-david.vercel.app" },
+    { id: "vps",    label: "VPS",    title: "VPS Hostinger (187.77.203.55)" },
+    { id: "lp",     label: "LPs",    title: "Landing Pages (não deployadas ainda)" },
+  ];
+
+  return (
+    <div className="health-bar">
+      {items.map((it) => {
+        const r = status[it.id];
+        const isErr = r.ok === false;
+        const isOk = r.ok === true;
+        const cls = r.ok === null ? "" : isErr ? "err" : r.ms > 2000 ? "slow" : "ok";
+        return (
+          <span
+            key={it.id}
+            className={`health-pill ${isErr ? "err" : ""}`}
+            title={`${it.title}${isOk ? ` · ${r.ms}ms` : isErr ? " · offline" : " · não configurado"}`}
+          >
+            <span className={`health-dot ${cls}`} />
+            <span>{it.label}</span>
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -5338,7 +5474,7 @@ function ThemeToggle({ currentTone, setBgTone }) {
   );
 }
 
-function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, onOpenSettings, onOpenMeta, countdown, currentTone, setBgTone }) {
+function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, onOpenSettings, onOpenMeta, countdown, currentTone, setBgTone, supabaseUrl, supabaseKey }) {
   const statusLabel = {
     mock: "Mock",
     loading: "Carregando…",
@@ -5358,6 +5494,7 @@ function Header({ liveOn, setLiveOn, lastUpdate, onRefresh, refreshing, status, 
       </div>
 
       <div className="header-tools">
+        <HealthBar supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} />
         <ThemeToggle currentTone={currentTone} setBgTone={setBgTone} />
         <button className="btn-meta" onClick={onOpenMeta}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -5555,6 +5692,8 @@ function Dashboard() {
         countdown={countdown}
         currentTone={t.bg_tone}
         setBgTone={(v) => { setTweak("bg_tone", v); try { localStorage.setItem("dashboard_theme", v); } catch {} }}
+        supabaseUrl={config?.url}
+        supabaseKey={config?.key}
       />
 
       <CandidateHero
