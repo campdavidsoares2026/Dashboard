@@ -399,7 +399,28 @@ body::before {
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.07);
   border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .1s;
+  user-select: none;
 }
+.acct-pill:hover {
+  background: rgba(255,255,255,.07);
+  border-color: rgba(255,213,0,.3);
+}
+.acct-pill.active {
+  background: rgba(255,213,0,.10);
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 1px var(--yellow) inset;
+}
+.acct-pill.dimmed { opacity: .45; }
+.acct-clear {
+  font-size: 10px; color: var(--yellow); cursor: pointer;
+  font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 8px; border-radius: 6px;
+  background: transparent; border: 1px dashed rgba(255,213,0,.4);
+  margin-left: auto;
+}
+.acct-clear:hover { background: rgba(255,213,0,.08); }
 .adot {
   width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
 }
@@ -834,6 +855,21 @@ const _today0 = localDateStr();
 let periodStart = _today0.slice(0, 8) + "01"; // início do mês atual
 let periodEnd   = _today0;
 
+// Filtro de conta — Set vazio = todas as contas (agregado).
+// Caso o usuário clique nos pills do Status das Contas, vira filtro ativo.
+const selectedAccounts = new Set();
+
+function toggleAccount(accountId) {
+  if (selectedAccounts.has(accountId)) selectedAccounts.delete(accountId);
+  else selectedAccounts.add(accountId);
+  loadAndRender();
+}
+
+function clearAccountFilter() {
+  selectedAccounts.clear();
+  loadAndRender();
+}
+
 const PRESET_IDS = ["btn-month","btn-30d","btn-14d","btn-7d","btn-today"];
 
 function _setActivePreset(id) {
@@ -957,6 +993,15 @@ function compute({ contas, snapsMonth, snapsChart, criativos, snapsPeriod, snaps
       latestMap[c.account_id] = c;
   });
   const active = Object.values(latestMap);
+
+  // ─── Aplica filtro de conta ANTES de qualquer agregação ───
+  // selectedAccounts vazio = "todas". `active` (status pills) sempre lista
+  // todas as contas pra preservar a UI de filtro; só as agregações filtram.
+  const inFilter = id => selectedAccounts.size === 0 || selectedAccounts.has(id);
+  snapsMonth  = (snapsMonth  || []).filter(s => inFilter(s.account_id));
+  snapsChart  = (snapsChart  || []).filter(s => inFilter(s.account_id));
+  snapsPeriod = Array.isArray(snapsPeriod) ? snapsPeriod.filter(s => inFilter(s.account_id)) : snapsPeriod;
+  snapsPrev   = (snapsPrev   || []).filter(s => inFilter(s.account_id));
 
   // Today / month from snapshots
   const todaySnaps  = (snapsMonth || []).filter(s => s.data === today);
@@ -1128,8 +1173,9 @@ function render(m) {
     if (el) el.textContent = periodLabel;
   });
 
-  // ── ACCOUNTS ──
+  // ── ACCOUNTS (clicáveis pra filtrar) ──
   const acEl = document.getElementById("accts-card");
+  const hasFilter = selectedAccounts.size > 0;
   const pills = m.active.map(c => {
     const shortNome = (c.nome || c.account_id).split("·").pop()?.trim() || c.nome || c.account_id;
     const agg = m.byAcct[c.account_id] || {};
@@ -1137,19 +1183,29 @@ function render(m) {
     const cpeeStr  = acctCpee > 0 ? BRLf(acctCpee) : "—";
     const cl = (c.classificacao_cpee || "").toUpperCase();
     const dot = cl === "SEM_DADOS" ? "err" : "ok";
-    return `<div class="acct-pill">
+    const isActive = selectedAccounts.has(c.account_id);
+    const cls = hasFilter ? (isActive ? "active" : "dimmed") : "";
+    return `<div class="acct-pill ${cls}" onclick="toggleAccount('${c.account_id}')" title="Clique para filtrar">
       <div class="adot ${dot}"></div>
       <div class="aname">${shortNome}</div>
       <div class="acpee">CPEE ${cpeeStr}</div>
       ${agg.spend > 0 ? `<div class="aspend">${BRL(agg.spend)}</div>` : ""}
     </div>`;
   }).join("");
-  acEl.innerHTML = `<div class="lbl" style="margin-bottom:6px">Status das Contas</div>${pills}`;
+  const clearBtn = hasFilter
+    ? `<span class="acct-clear" onclick="clearAccountFilter()">✕ limpar filtro</span>`
+    : "";
+  const filterLbl = hasFilter
+    ? `Filtrando ${selectedAccounts.size} de ${m.active.length} contas`
+    : "Status das Contas · clique para filtrar";
+  acEl.innerHTML = `<div class="lbl" style="margin-bottom:6px;display:flex;align-items:center">${filterLbl}${clearBtn}</div>${pills}`;
 
   // ── TOTAL (período selecionado) ──
   set("total-val", BRL(m.gasto_per));
   renderDelta("total-delta", m.gasto_delta_pct);
-  set("total-sub", `${m.active.length} conta${m.active.length !== 1 ? "s" : ""} ativa${m.active.length !== 1 ? "s" : ""} · ${m.diasUnicos} dia${m.diasUnicos !== 1 ? "s" : ""}`);
+  const nVisible = selectedAccounts.size > 0 ? selectedAccounts.size : m.active.length;
+  const totalSubBase = `${nVisible} conta${nVisible !== 1 ? "s" : ""} · ${m.diasUnicos} dia${m.diasUnicos !== 1 ? "s" : ""}`;
+  set("total-sub", selectedAccounts.size > 0 ? `🔍 ${totalSubBase} (filtrado)` : totalSubBase);
 
   // ── BAR CHART ──
   renderBars(m.chartDays);
